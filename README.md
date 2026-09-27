@@ -15,7 +15,7 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - Launch opens a title menu: Continue (when a checkpoint exists), New game, Settings, Controls. New game asks for a difficulty: Easy (Doom's "too young to die": half damage, double ammo), Normal, or Hard; the choice is remembered.
 - Checkpoints: entering a level (new game or next map) saves the map, difficulty and inventory. Continue resumes there after quitting; dying and the pause menu's "Restart level" reload the level with that inventory (health at least 50). Keys are per level, as in Doom. Finishing the episode clears the checkpoint.
 - If the engine hits a fatal error, an error page replaces the game (Back exits) instead of the app freezing.
-- Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), speaker music, and haptics.
+- Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), and haptics (a buzz when you take damage). There is no music.
 - Losing app focus clears held inputs and pauses gameplay.
 - Hold Back: system exit.
 - Touch drag horizontally: turn; double tap: cycle weapons. Touch requires compatible firmware and remains unverified on a physical watch.

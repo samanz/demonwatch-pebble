@@ -20,7 +20,7 @@ pebble_input_state_t g_pebble_input;
 static bool s_touching, s_up, s_down;
 enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL };
 static uint8_t s_page=TITLE, s_parent=TITLE, s_choice, s_sensitivity=2, s_tilt_mode=1, s_skill=sk_medium;
-static bool s_invert, s_vibe_enabled=true, s_speaker_enabled=true;
+static bool s_invert, s_vibe_enabled=true;
 #define s_paused (s_page != GAME)
 static bool s_touch_subscribed;
 static int16_t s_touch_start_x, s_touch_start_y, s_touch_last_x;
@@ -66,168 +66,12 @@ static uint32_t now_ms(void) {
 // is timed separately. Halves drawing work (and battery) versus 60 fps.
 #define FRAME_INTERVAL_MS 33
 
-/* Authentic Metallica / E1M1 "At Doom's Gate" Speaker Riff */
-static const SpeakerNote s_e1m1_guitar_notes[] = {
-    // Measure 1: E E E G - E E Bb -
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 43, SpeakerWaveformSawtooth, 195, 127, 0 }, // G2
-    {  0, SpeakerWaveformSawtooth, 20,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 46, SpeakerWaveformSawtooth, 195, 127, 0 }, // Bb2
-    {  0, SpeakerWaveformSawtooth, 20,   0, 0 },
-
-    // Measure 2: E E E B C B A
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 47, SpeakerWaveformSawtooth, 95, 127, 0 },  // B2
-    {  0, SpeakerWaveformSawtooth, 15,   0, 0 },
-    { 48, SpeakerWaveformSawtooth, 100, 127, 0 }, // C3
-    {  0, SpeakerWaveformSawtooth, 15,   0, 0 },
-    { 47, SpeakerWaveformSawtooth, 95, 127, 0 },  // B2
-    {  0, SpeakerWaveformSawtooth, 15,   0, 0 },
-    { 45, SpeakerWaveformSawtooth, 200, 127, 0 }, // A2
-    {  0, SpeakerWaveformSawtooth, 20,   0, 0 },
-
-    // Measure 3: E E E G - E E Bb -
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 43, SpeakerWaveformSawtooth, 195, 127, 0 }, // G2
-    {  0, SpeakerWaveformSawtooth, 20,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 46, SpeakerWaveformSawtooth, 195, 127, 0 }, // Bb2
-    {  0, SpeakerWaveformSawtooth, 20,   0, 0 },
-
-    // Measure 4: E E Bb B Bb G E
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 90, 127, 0 },  // E2
-    {  0, SpeakerWaveformSawtooth, 18,   0, 0 },
-    { 46, SpeakerWaveformSawtooth, 95, 127, 0 },  // Bb2
-    {  0, SpeakerWaveformSawtooth, 15,   0, 0 },
-    { 47, SpeakerWaveformSawtooth, 95, 127, 0 },  // B2
-    {  0, SpeakerWaveformSawtooth, 15,   0, 0 },
-    { 46, SpeakerWaveformSawtooth, 95, 127, 0 },  // Bb2
-    {  0, SpeakerWaveformSawtooth, 15,   0, 0 },
-    { 43, SpeakerWaveformSawtooth, 95, 127, 0 },  // G2
-    {  0, SpeakerWaveformSawtooth, 15,   0, 0 },
-    { 40, SpeakerWaveformSawtooth, 320, 127, 0 }, // E2
-    {  0, SpeakerWaveformSawtooth, 90,   0, 0 }
-};
-
-static const SpeakerNote s_e1m1_bass_notes[] = {
-    // Measure 1
-    { 28, SpeakerWaveformSquare, 320, 100, 0 }, // E1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 31, SpeakerWaveformSquare, 200, 100, 0 }, // G1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-    { 28, SpeakerWaveformSquare, 215, 100, 0 }, // E1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-    { 34, SpeakerWaveformSquare, 200, 100, 0 }, // Bb1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-
-    // Measure 2
-    { 28, SpeakerWaveformSquare, 320, 100, 0 }, // E1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 35, SpeakerWaveformSquare, 105, 100, 0 }, // B1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 36, SpeakerWaveformSquare, 110, 100, 0 }, // C2
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 35, SpeakerWaveformSquare, 105, 100, 0 }, // B1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 33, SpeakerWaveformSquare, 205, 100, 0 }, // A1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-
-    // Measure 3
-    { 28, SpeakerWaveformSquare, 320, 100, 0 }, // E1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 31, SpeakerWaveformSquare, 200, 100, 0 }, // G1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-    { 28, SpeakerWaveformSquare, 215, 100, 0 }, // E1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-    { 34, SpeakerWaveformSquare, 200, 100, 0 }, // Bb1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-
-    // Measure 4
-    { 28, SpeakerWaveformSquare, 215, 100, 0 }, // E1
-    {  0, SpeakerWaveformSquare,  15,   0, 0 },
-    { 34, SpeakerWaveformSquare, 105, 100, 0 }, // Bb1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 35, SpeakerWaveformSquare, 105, 100, 0 }, // B1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 34, SpeakerWaveformSquare, 105, 100, 0 }, // Bb1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 31, SpeakerWaveformSquare, 105, 100, 0 }, // G1
-    {  0, SpeakerWaveformSquare,  10,   0, 0 },
-    { 28, SpeakerWaveformSquare, 320, 100, 0 }, // E1
-    {  0, SpeakerWaveformSquare,  90,   0, 0 }
-};
-
-static void start_doom_speaker_music(void);
-
-static void on_speaker_finished(SpeakerFinishReason reason, void *ctx) {
-    if(reason==SpeakerFinishReasonDone && s_page==GAME && s_speaker_enabled) {
-        start_doom_speaker_music();
-    }
-}
-
-static void start_doom_speaker_music(void) {
-    if(!s_speaker_enabled || s_page!=GAME || speaker_is_muted()) return;
-    speaker_set_finish_callback(on_speaker_finished, NULL);
-    static const SpeakerTrack tracks[] = {
-        { .notes = s_e1m1_guitar_notes, .num_notes = ARRAY_LENGTH(s_e1m1_guitar_notes), .sample = NULL },
-        { .notes = s_e1m1_bass_notes,   .num_notes = ARRAY_LENGTH(s_e1m1_bass_notes),   .sample = NULL }
-    };
-    if(!speaker_play_tracks(tracks, 2, 90)) {
-        speaker_play_notes(s_e1m1_guitar_notes, ARRAY_LENGTH(s_e1m1_guitar_notes), 90);
-    }
-}
-
-static void stop_doom_speaker_music(void) {
-    speaker_set_finish_callback(NULL, NULL);
-    speaker_stop();
-}
-
-static void play_doom_riff_haptic(void) {
-    if(!s_vibe_enabled) return;
-    static const uint32_t segments[] = {
-        80, 50, 80, 50, 80, 50, 180, 60,
-        80, 50, 80, 50, 180, 60,
-        80, 50, 80, 50, 80, 50,
-        140, 50, 140, 50, 140, 50, 220
-    };
-    VibePattern pat = {
-        .durations = segments,
-        .num_segments = ARRAY_LENGTH(segments),
-    };
-    vibes_enqueue_custom_pattern(pat);
-}
 static void clear_input(void) {
     memset(&g_pebble_input,0,sizeof(g_pebble_input));
     s_up=s_down=s_touching=false;
 }
 static void dirty(void) { if(s_canvas_layer) layer_mark_dirty(s_canvas_layer); }
 static void page(uint8_t next) {
-    if(next!=GAME) stop_doom_speaker_music();
-    else if(s_page!=GAME && s_speaker_enabled) start_doom_speaker_music();
     s_page=next; s_choice=0; clear_input(); s_accumulator=0; dirty();
 }
 static void text(GContext *ctx,const char *str,int y,const char *font) {
@@ -274,7 +118,6 @@ void I_PebbleRestoreCheckpoint(struct player_s *p) {
 // ----- fatal errors -----------------------------------------------------------
 static __attribute__((noinline)) void enter_fatal(void) {
     s_fatal_armed=false;
-    stop_doom_speaker_music();
     s_page=FATAL; s_choice=0; clear_input(); dirty();
 }
 _Noreturn void I_PebbleFatal(const char *message) {
@@ -294,7 +137,7 @@ static __attribute__((noinline)) bool guarded(void (*fn)(void)) {
 
 // ----- menus ------------------------------------------------------------------
 enum { A_CONTINUE, A_NEW, A_SETTINGS, A_CONTROLS, A_RESUME, A_RESTART, A_QUIT,
-       A_EASY, A_NORMAL, A_HARD, A_SENS, A_TURN, A_TILT, A_SPEAKER, A_HAPTIC, A_BACK };
+       A_EASY, A_NORMAL, A_HARD, A_SENS, A_TURN, A_TILT, A_HAPTIC, A_BACK };
 static __attribute__((noinline)) int menu(const char **labels,uint8_t *actions) {
     int n=0;
 #define ITEM(label,action) (labels[n]=(label),actions[n++]=(action))
@@ -311,7 +154,6 @@ static __attribute__((noinline)) int menu(const char **labels,uint8_t *actions) 
         ITEM(s_sensitivity==1 ? "Sens: gentle" : s_sensitivity==2 ? "Sens: normal" : "Sens: fast",A_SENS);
         ITEM(s_invert ? "Turn: inverted" : "Turn: normal",A_TURN);
         ITEM(s_tilt_mode==0 ? "Tilt: off" : s_tilt_mode==1 ? "Tilt: steer" : "Tilt: strafe",A_TILT);
-        ITEM(s_speaker_enabled ? "Speaker: on" : "Speaker: off",A_SPEAKER);
         ITEM(s_vibe_enabled ? "Haptic: on" : "Haptic: off",A_HAPTIC);
         ITEM("Back",A_BACK);
     }
@@ -523,8 +365,6 @@ static __attribute__((noinline)) void start_game(bool from_checkpoint) {
         s_restore_pending=false;
         G_DeferedInitNew((skill_t)s_skill);
     }
-    play_doom_riff_haptic();
-    if(s_speaker_enabled) start_doom_speaker_music();
 }
 // Reload the current level with the inventory it was entered with.
 static void restart_level(void) {
@@ -565,12 +405,6 @@ static void select_press(ClickRecognizerRef r,void *c) {
         case A_SENS: s_sensitivity=s_sensitivity%3+1; persist_write_int(1,s_sensitivity); break;
         case A_TURN: s_invert=!s_invert; persist_write_bool(2,s_invert); break;
         case A_TILT: s_tilt_mode=(s_tilt_mode+1)%3; persist_write_int(3,s_tilt_mode); break;
-        case A_SPEAKER:
-            s_speaker_enabled=!s_speaker_enabled;
-            persist_write_bool(5,s_speaker_enabled);
-            if(!s_speaker_enabled) stop_doom_speaker_music();
-            else if(s_parent==GAME) start_doom_speaker_music();
-            break;
         case A_HAPTIC: s_vibe_enabled=!s_vibe_enabled; persist_write_bool(4,s_vibe_enabled); break;
         case A_BACK: page(s_parent); break;
         }
@@ -618,7 +452,6 @@ static void main_window_load(Window *window) {
     s_frame_timer=app_timer_register(s_paused ? 200 : FRAME_INTERVAL_MS,frame_timer_callback,NULL);
 }
 static void main_window_unload(Window *window) {
-    stop_doom_speaker_music();
     if(s_frame_timer) { app_timer_cancel(s_frame_timer); s_frame_timer=NULL; }
     if(s_touch_subscribed) touch_service_unsubscribe();
     layer_destroy(s_canvas_layer); s_canvas_layer=NULL;
@@ -636,7 +469,6 @@ int main(void) {
         if(saved_tilt>=0 && saved_tilt<=2) s_tilt_mode=saved_tilt;
     }
     if(persist_exists(4)) s_vibe_enabled=persist_read_bool(4);
-    if(persist_exists(5)) s_speaker_enabled=persist_read_bool(5);
     if(persist_exists(KEY_SKILL)) {
         int skill=persist_read_int(KEY_SKILL);
         if(skill>=sk_baby && skill<=sk_hard) s_skill=skill;
