@@ -1,5 +1,6 @@
-/* Resource-backed Doom64KB data. Permanent lumps retain stable addresses;
- * graphics are valid until the next graphics request. No flash pointers escape. */
+/* Resource-backed Doom64KB data. Global lumps stay resident; map lumps live
+ * until the next level load (the zone clears their resident[] entry).
+ * Graphics are valid until the next graphics request. No flash pointers escape. */
 #include <pebble.h>
 #include <stdint.h>
 #include <string.h>
@@ -42,6 +43,14 @@ int16_t W_GetNumForName(const char *name) {
 }
 static int graphics_lump(int n) {
     return (n > pstart && n < pend) || (n > sstart && n < send);
+}
+/* True for the nine data lumps that follow an ExMy map marker. */
+static int map_lump(int n) {
+    for (int m=n-1; m>=0 && m>=n-9; --m) {
+        const char *s=directory[m].name;
+        if (s[0]=='E' && s[2]=='M' && s[3]>='1' && s[3]<='9' && !s[4]) return 1;
+    }
+    return 0;
 }
 void W_Init(void) {
     resource = resource_get_handle(RESOURCE_ID_E1M1_WAD);
@@ -86,7 +95,8 @@ const void *W_GetLumpByNum(int16_t num) {
         return scratch;
     }
     if (!resident[num]) {
-        resident[num]=Z_MallocStatic(l->size ? l->size : 1);
+        uint16_t size=l->size ? l->size : 1;
+        resident[num]=map_lump(num) ? Z_MallocLevel(size,&resident[num]) : Z_MallocStatic(size);
         read_exact(l->offset,resident[num],l->size);
     }
     return resident[num];

@@ -1,6 +1,11 @@
-import struct
+"""Print a size breakdown of a .pbl resource.
 
-with open("resources/e1m1.pbl", "rb") as f:
+Usage: python3 tools/inspect_pbl.py [resources/arena.pbl]
+"""
+import struct
+import sys
+
+with open(sys.argv[1] if len(sys.argv) > 1 else "resources/arena.pbl", "rb") as f:
     data = f.read()
 
 numlumps, infoofs = struct.unpack_from("<ii", data, 4)

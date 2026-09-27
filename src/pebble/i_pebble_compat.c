@@ -14,6 +14,7 @@ extern int vsnprintf(char *, size_t, const char *, va_list);
 #include "../doom/i_system.h"
 #include "../doom/i_video.h"
 #include "../doom/sounds.h"
+#include "../doom/globdata.h"
 
 extern void *malloc(size_t size);
 extern void app_log(uint8_t log_level, const char* src_filename, int src_line_number, const char* fmt, ...);
@@ -44,6 +45,7 @@ void I_InitTimer(void) { s_gametic = 0; }
 int32_t I_GetTime(void) { return ++s_gametic; }
 
 _Noreturn void I_Quit(void) { for(;;); }
+// Logs the format string only: Pebble's libc has no vsnprintf.
 _Noreturn void I_Error(const char *error, ...) {
     app_log(1, "doom", 0, "FATAL: %s", error);
     for(;;);
@@ -104,9 +106,10 @@ void ST_Ticker(void) {}
 void ST_Drawer(void) {}
 void ST_doPaletteStuff(void) {}
 
-// Finale Stubs
+// Finale Stubs. G_Ticker loops until the game action is cleared, so the
+// victory action must end here; the Pebble layer shows the ending screen.
 void F_Init(void) {}
-void F_StartFinale(void) {}
+void F_StartFinale(void) { _g_gameaction = ga_nothing; _g_gamestate = GS_FINALE; }
 void F_Ticker(void) {}
 void F_Drawer(void) {}
 
@@ -140,8 +143,6 @@ void V_DrawCharacterForeground(int16_t x, int16_t y, uint8_t color, char c) { (v
 void V_DrawSTCharacter(int16_t x, int16_t y, uint8_t color, char c) { (void)x; (void)y; (void)color; (void)c; }
 void V_DrawSTString(int16_t x, int16_t y, uint8_t color, const char* s) { (void)x; (void)y; (void)color; (void)s; }
 void V_SetSTPalette(void) {}
-
-#include "../doom/globdata.h"
 
 // Automap & Intermission Stubs
 enum automapmode_e automapmode = 0;

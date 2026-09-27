@@ -486,8 +486,14 @@ void P_SetupLevel(int16_t map)
     snprintf(lumpname, sizeof(lumpname), "E1M%d", map);   // killough 1/24/98: simplify
 
     lumpnum = W_GetNumForName(lumpname);
+    if (lumpnum < 0)
+    {
+        char msg[32];
+        snprintf(msg, sizeof(msg), "Missing map %s", lumpname);
+        I_Error(msg);
+    }
 
-    P_LoadThings    (lumpnum + ML_THINGS);
+    P_LoadThings   (lumpnum + ML_THINGS);
     P_LoadSectors   (lumpnum + ML_SECTORS);
     P_LoadLineDefs  (lumpnum + ML_LINEDEFS);
     P_LoadSegs      (lumpnum + ML_SEGS);

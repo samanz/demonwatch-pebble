@@ -29,7 +29,6 @@ def build(ctx):
         '-DVIEWWINDOWWIDTH=120',
         '-DVIEWWINDOWHEIGHT=114',
         '-DMAPWIDTH=120',
-        '-DLOW_MEMORY',
         '-DPEBBLE_EMERY',
         '-DC_ONLY=1',
     ]

@@ -2130,7 +2130,8 @@ static void R_RenderSegLoop(int16_t rw_x, boolean segtextured, boolean markfloor
 static boolean R_CheckOpenings(const int16_t start)
 {
     int16_t pos = lastopening - openings;
-    int16_t need = (rw_stopx - start)*sizeof(int16_t) + pos;
+    // A seg can store up to three arrays: masked columns, top and bottom clips.
+    int16_t need = (rw_stopx - start)*3 + pos;
 
 #ifdef RANGECHECK
     if(need > MAXOPENINGS)

@@ -16,6 +16,15 @@ size_t resource_load_byte_range(ResHandle r,uint32_t off,uint8_t *dest,size_t n)
 }
 void app_log(uint8_t a,const char *b,int c,const char *d,...) {}
 void *Z_MallocStatic(size_t n) { void *p=calloc(1,n); assert(p); return p; }
+/* Level allocations record their owner so the test can emulate Z_FreeTags. */
+static void **level_users[64]; static int level_count;
+void *Z_MallocLevel(size_t n,void **user) {
+    assert(level_count<64); level_users[level_count++]=user; return Z_MallocStatic(n);
+}
+static void free_level(void) {
+    for(int i=0;i<level_count;++i) { free(*level_users[i]); *level_users[i]=NULL; }
+    level_count=0;
+}
 _Noreturn void I_Error(const char *s,...) { longjmp(failure,1); }
 int main(int argc,char **argv) {
     assert(argc==2);
@@ -36,8 +45,17 @@ int main(int argc,char **argv) {
     assert(a==W_GetLumpByNum(lines) && !memcmp(a,snapshot,n));
     unsigned char *copy=malloc(n); W_ReadLumpByNum(lines,copy);
     assert(!memcmp(copy,snapshot,n));
+    /* Map lumps are level-tagged; global lumps are not. */
+    int textures=W_GetNumForName("TEXTURE1"); assert(textures>=0);
+    const void *t=W_GetLumpByNum(textures);
+    assert(level_count==2);
+    free_level();
+    before=reads;
+    const void *reloaded=W_GetLumpByNum(lines);
+    assert(reads==before+1 && !memcmp(reloaded,snapshot,n));
+    assert(t==W_GetLumpByNum(textures) && reads==before+1);
     if(!setjmp(failure)) { W_GetLumpByNum(-1); assert(!"invalid ID accepted"); }
     if(!setjmp(failure)) { volatile uint16_t bad=W_LumpLength(32767); (void)bad; assert(!"invalid ID accepted"); }
-    puts("PASS: full reads, stable map pointers, scratch reuse, cache hit, invalid IDs");
+    puts("PASS: full reads, stable pointers, level lumps freed and reloaded, scratch reuse, cache hit, invalid IDs");
     return 0;
 }

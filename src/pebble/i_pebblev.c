@@ -8,7 +8,6 @@
 #undef false
 #undef true
 #include "i_pebble.h"
-#include "pebble_pal.h"
 #include "../doom/doomtype.h"
 #include "../doom/r_defs.h"
 #include "../doom/r_main.h"

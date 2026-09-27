@@ -10,6 +10,7 @@
 #include "../doom/r_main.h"
 #include "../doom/globdata.h"
 #include "../doom/i_system.h"
+#include "../doom/w_wad.h"
 
 static Window *s_main_window;
 static Layer *s_canvas_layer;
@@ -25,7 +26,8 @@ static int16_t s_touch_start_x, s_touch_start_y, s_touch_last_x;
 static uint32_t s_touch_at, s_last_tap, s_last_tick, s_accumulator;
 static unsigned s_frames;
 static uint32_t s_max_draw_ms, s_max_tick_ms, s_max_gap_ms;
-static unsigned s_hits;
+static unsigned s_hits, s_clock_skips;
+static gamestate_t s_last_state=GS_DEMOSCREEN;  // logged on change, e.g. "state 1 map 1" = level cleared
 static uint32_t now_ms(void) {
     time_t sec; uint16_t ms; time_ms(&sec,&ms);
     return (uint32_t)sec*1000u+ms;
@@ -199,6 +201,13 @@ static void page(uint8_t next) {
 static void text(GContext *ctx,const char *str,int y,const char *font) {
     graphics_draw_text(ctx,str,fonts_get_system_font(font),GRect(10,y,180,40),GTextOverflowModeTrailingEllipsis,GTextAlignmentCenter,NULL);
 }
+/* After an exit, is there a map to continue to? E1M8 ends the episode. */
+static bool next_map_exists(void) {
+    if(_g_gamestate!=GS_INTERMISSION || _g_gamemap==8) return false;
+    char name[]="E1M1";
+    name[3]='1'+_g_wminfo.next;
+    return W_GetNumForName(name)>=0;
+}
 static void draw_menu(GContext *ctx) {
     graphics_context_set_fill_color(ctx,GColorBlack);
     graphics_fill_rect(ctx,GRect(0,0,200,228),0,GCornerNone);
@@ -245,20 +254,28 @@ static void canvas_update_proc(Layer *layer,GContext *ctx) {
     graphics_draw_text(ctx,"HP",label,GRect(18,190,40,16),GTextOverflowModeTrailingEllipsis,GTextAlignmentLeft,NULL);
     graphics_draw_text(ctx,"AMMO",label,GRect(85,190,50,16),GTextOverflowModeTrailingEllipsis,GTextAlignmentLeft,NULL);
     graphics_draw_text(ctx,"ARM",label,GRect(150,190,45,16),GTextOverflowModeTrailingEllipsis,GTextAlignmentLeft,NULL);
-    if(s_paused || _g_gamestate!=GS_LEVEL || _g_player.playerstate==PST_DEAD) {
+    if(_g_gamestate!=GS_LEVEL || _g_player.playerstate==PST_DEAD) {
         graphics_context_set_fill_color(ctx,GColorBlack);
         graphics_fill_rect(ctx,GRect(10,40,180,105),0,GCornerNone);
-        const char *title=s_paused ? "PAUSED" : _g_player.playerstate==PST_DEAD ? "YOU DIED" : "LEVEL CLEAR";
+        const char *title,*hint;
+        if(_g_gamestate==GS_LEVEL) { title="YOU DIED"; hint="Select: retry level\nDouble Back: menu"; }
+        else if(next_map_exists()) { title="LEVEL CLEAR"; hint="Select: next level\nDouble Back: menu"; }
+        else { title="YOU WIN"; hint="Select: play again\nDouble Back: menu"; }
         graphics_draw_text(ctx,title,fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),GRect(10,44,180,30),GTextOverflowModeTrailingEllipsis,GTextAlignmentCenter,NULL);
-        graphics_draw_text(ctx,s_paused ? "Select: resume\nUp: restart  Down: exit" : "Select: play again\nDouble Back: menu",label,GRect(16,80,168,56),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
+        graphics_draw_text(ctx,hint,label,GRect(16,80,168,56),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
     }
-    uint32_t draw_ms=now_ms()-draw_start;
-    if(draw_ms>s_max_draw_ms) s_max_draw_ms=draw_ms;
+    int32_t draw_ms=(int32_t)(now_ms()-draw_start);
+    if(draw_ms>(int32_t)s_max_draw_ms) s_max_draw_ms=draw_ms;
 }
 static void frame_timer_callback(void *data) {
     s_frame_timer=NULL;
-    uint32_t now=now_ms(), elapsed=now-s_last_tick;
+    // time_ms() jumps by about a second around each second boundary in the
+    // emulator. Count an implausible jump as one nominal frame instead.
+    uint32_t now=now_ms(), elapsed=FRAME_INTERVAL_MS;
+    int32_t delta=(int32_t)(now-s_last_tick);
     s_last_tick=now;
+    if(delta>=0 && delta<=500) elapsed=delta;
+    else if(!s_paused) ++s_clock_skips;
     if(!s_paused && elapsed>s_max_gap_ms) s_max_gap_ms=elapsed;
     if(!s_paused) {
         if(elapsed>120) elapsed=120;
@@ -266,6 +283,7 @@ static void frame_timer_callback(void *data) {
         while(s_accumulator>=1000) {
             s_accumulator-=1000;
             g_pebble_input.forward_move=g_pebble_input.button_attack ? 0 : (s_up-s_down)*25;
+            g_pebble_input.side_move=0;
             if(g_pebble_input.button_attack && (s_up || s_down)) {
                 g_pebble_input.angle_turn+=(s_up-s_down)*900;
             }
@@ -292,18 +310,22 @@ static void frame_timer_callback(void *data) {
             uint32_t tick_start=now_ms();
             int old_health=_g_player.health;
             G_BuildTiccmd(); G_Ticker(); ++_g_gametic;
+            if(_g_gamestate!=s_last_state) {
+                s_last_state=_g_gamestate;
+                APP_LOG(APP_LOG_LEVEL_INFO,"state %d map %d",_g_gamestate,_g_gamemap);
+            }
             if(_g_player.health<old_health) {
                 ++s_hits;
                 if(s_vibe_enabled) vibes_double_pulse();
             }
-            uint32_t tick_ms=now_ms()-tick_start;
-            if(tick_ms>s_max_tick_ms) s_max_tick_ms=tick_ms;
+            int32_t tick_ms=(int32_t)(now_ms()-tick_start);
+            if(tick_ms>(int32_t)s_max_tick_ms) s_max_tick_ms=tick_ms;
             if(_g_gametic%105==0 && _g_player.mo) {
                 APP_LOG(APP_LOG_LEVEL_INFO,"tick %ld pos %ld,%ld hp%d ammo%d kills%d frames%u heap%lu",_g_gametic,
                     _g_player.mo->x>>16,_g_player.mo->y>>16,_g_player.health,
                     _g_player.ammo[0],_g_player.killcount,s_frames,(unsigned long)heap_bytes_free());
-                APP_LOG(APP_LOG_LEVEL_INFO,"timing draw%lu tick%lu gap%lu hits%u",(unsigned long)s_max_draw_ms,(unsigned long)s_max_tick_ms,(unsigned long)s_max_gap_ms,s_hits);
-                s_frames=s_hits=0; s_max_draw_ms=s_max_tick_ms=s_max_gap_ms=0;
+                APP_LOG(APP_LOG_LEVEL_INFO,"timing draw%lu tick%lu gap%lu hits%u skips%u",(unsigned long)s_max_draw_ms,(unsigned long)s_max_tick_ms,(unsigned long)s_max_gap_ms,s_hits,s_clock_skips);
+                s_frames=s_hits=s_clock_skips=0; s_max_draw_ms=s_max_tick_ms=s_max_gap_ms=0;
             }
         }
     } else s_accumulator=0;
@@ -370,7 +392,9 @@ static void select_press(ClickRecognizerRef r,void *c) {
         else { s_parent=previous; page(choice==(previous==TITLE ? 1 : 2) ? SETTINGS : HELP); }
         return;
     }
-    if(_g_player.playerstate==PST_DEAD || _g_gamestate!=GS_LEVEL) restart();
+    if(_g_gamestate==GS_LEVEL && _g_player.playerstate==PST_DEAD) _g_player.playerstate=PST_REBORN;
+    else if(next_map_exists()) G_WorldDone();
+    else if(_g_gamestate!=GS_LEVEL) restart();
     else g_pebble_input.button_attack=true;
 }
 static void select_release(ClickRecognizerRef r,void *c) { g_pebble_input.button_attack=false; }
@@ -421,10 +445,11 @@ int main(void) {
         int saved_tilt=persist_read_int(3);
         if(saved_tilt>=0 && saved_tilt<=2) s_tilt_mode=saved_tilt;
     }
+    if(persist_exists(4)) s_vibe_enabled=persist_read_bool(4);
     if(persist_exists(5)) s_speaker_enabled=persist_read_bool(5);
     app_focus_service_subscribe(focus_changed);
-    const char *argv[]={"pdoom","-warp","1","1"};
-    D_DoomMain(4,argv);
+    const char *argv[]={"pdoom"};
+    D_DoomMain(1,argv);
     s_main_window=window_create();
     if(!s_main_window) I_Error("Window allocation");
     window_set_background_color(s_main_window,GColorBlack);

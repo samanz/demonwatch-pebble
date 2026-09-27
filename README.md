@@ -4,19 +4,21 @@ Native Doom64KB-derived game for Pebble Time 2 (Emery), built with Pebble SDK 4.
 
 ## Install and play
 
-Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Emery. The development build is `build/pdoom.pbw`; older root-level binaries are obsolete.
+Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Emery. The development build is `build/pdoom.pbw`.
 
 - Up / Down: move forward / backward.
 - Hold Select: fire. While held, Up / Down turn left / right.
 - Back once: use door or exit switch.
 - Hold Select and click Back: cycle owned weapons.
+- Tilt the watch left / right: turn (default) or strafe, chosen in Settings.
 - Double Back: open the pause menu. Up/Down choose Resume, Restart, Settings, Controls, or Quit; Select confirms. Back resumes.
 - Launch opens a title menu: New game, Settings, Controls.
-- Settings save gentle/normal/fast touch sensitivity and normal/inverted turn direction.
+- Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), speaker music, and haptics.
 - Losing app focus clears held inputs and pauses gameplay.
 - Hold Back: system exit.
 - Touch drag horizontally: turn; double tap: cycle weapons. Touch requires compatible firmware and remains unverified on a physical watch.
-- After death or level completion: Select restarts.
+- After death: Select retries the current level.
+- After the exit switch: Select continues to the next map (E1M2, E1M3, … when present, keeping inventory). After the last map, Select starts a new game.
 
 Walk toward the door, press Back, fight through both combat rooms, then use the switch on the far wall. The door closes automatically and can be reopened.
 
@@ -26,7 +28,9 @@ The Emery emulator was used to exercise movement, pickup, door use, killing enem
 
 The renderer uses 120 x 114 logical pixels scaled to a 200 x 190 view, plus a health/ammo/armor HUD. Engine simulation runs at 35 ticks per second. Physical Emery hardware running PebbleOS 4.38.2 has now launched successfully and logged movement. Extended gameplay, battery use, and touch feel still need hardware testing. There is no sound, save system, full E1M1, or arbitrary WAD support. This is a playable prototype, not an App Store release.
 
-SDK measurements: resources 135,917 bytes; static RAM footprint 62,017 bytes; initial available heap 69,055 bytes. Runtime free heap in this arena is approximately 12 KB. The loaded image also must fit the SDK header's 65,535-byte field, so static memory headroom is still limited.
+SDK measurements: resources 145,013 bytes; static RAM footprint 64,138 bytes; initial available heap 66,934 bytes. Runtime free heap in this arena is approximately 10 KB. The loaded image (64,140 bytes) must fit the SDK header's 65,535-byte field, so fewer than 1.4 KB of code/static data headroom remain.
+
+Map lumps (THINGS through BLOCKMAP after each `E1Mx` marker) are released on every level load, so additional maps do not accumulate in the 24 KB Doom zone. Global lumps (textures, colormap) stay resident; sprite and wall patches stream through one scratch buffer.
 
 ## Build
 
@@ -41,7 +45,7 @@ pebble install --emulator emery
 
 `tools/run_pebble.py` is a convenience wrapper for the original development machine's SDK paths; adapt it for another machine or use `pebble` directly. The checked-in Freedoom art pack makes arena generation independent of downloading the original release.
 
-To regenerate the art pack, place the official Freedoom 0.13.0 zip at `work/freedoom-0.13.0.zip`, run `python3 tools/import_freedoom.py`, then regenerate the arena. Archive SHA256: `3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59`.
+To regenerate the art pack, place the official Freedoom 0.13.0 zip at `work/freedoom-0.13.0.zip`, run `python3 tools/import_freedoom.py work/freedoom-0.13.0.zip`, then regenerate the arena. Archive SHA256: `3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59`.
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -49,9 +53,13 @@ gcc -std=c11 -g -fsanitize=address,undefined -Itests tests/test_wad.c src/pebble
 ASAN_OPTIONS=detect_leaks=0 ./work/test_wad resources/arena.pbl
 gcc -std=c11 -g -fsanitize=address,undefined -DVIEWWINDOWWIDTH=120 -DVIEWWINDOWHEIGHT=114 -DFLAT_SPAN tests/test_video.c src/pebble/i_pebblev.c -o work/test_video
 ./work/test_video
+gcc -std=c11 -g -fsanitize=address,undefined tests/test_ascii.c src/pebble/ascii.c -o work/test_ascii
+./work/test_ascii
 ```
 
-Create `work/` before running native tests. `tools/check_playthrough.py` drives a freshly installed emulator app and saves screenshots and logs there.
+Create `work/` before running native tests. `tools/check_playthrough.py` drives a freshly installed emulator app through all three rooms to the exit switch, saves screenshots and logs there, and checks the log for the level-complete state change (`state 1 map 1`). `tools/check_menus.py` captures menu and settings-persistence screenshots.
+
+The project is a git repository; on this machine git is available inside WSL, not on Windows.
 
 ## Attribution
 
@@ -59,7 +67,7 @@ Engine source is GPL-2.0; see LICENSE and original source headers. Upstream repo
 - https://github.com/FrenkelS/Doom64KB (local reference commit 058e4d4a75da7187fff3c6f357647d9f069605f7)
 - https://github.com/akiyan/genesis-DOOM64KB (local reference commit 5da4cf9d6b46e78078d208f46e52ee40c36c67b4)
 
-Freedoom artwork is distributed under its BSD license; see licenses/Freedoom-COPYING.txt and licenses/Freedoom-CREDITS.txt. Source: https://github.com/freedoom/freedoom/releases/tag/v0.13.0 . Converted sprites retain logical dimensions with reduced color/detail. Walls, doors, and exit panels use original low-detail artwork designed for the watch display. Original arena geometry and procedural fallback artwork are dedicated to CC0. The source archive includes the modified engine, port, asset generators, converted art, build configuration, and tests.
+Freedoom artwork is distributed under its BSD license; see licenses/Freedoom-COPYING.txt and licenses/Freedoom-CREDITS.txt. Source: https://github.com/freedoom/freedoom/releases/tag/v0.13.0 . Converted sprites retain logical dimensions with reduced color/detail. Wall, door, and exit-panel textures are rescaled from Freedoom STARTAN3, BIGDOOR2, and SW1EXIT. Original arena geometry and the procedural fallback artwork used when the Freedoom art pack is absent are dedicated to CC0. The source archive includes the modified engine, port, asset generators, converted art, build configuration, and tests.
 
 ## Hardware startup fix (2026-09-27)
 
@@ -67,7 +75,9 @@ The initial emulator-tested build crashed on physical hardware in newlib strcase
 
 ## Damage hitch investigation
 
-The current diagnostic build reports maximum drawing time, game-tick time, timer gap (all milliseconds), and damage-event count every 105 game ticks. A hardware capture with seven damage events showed game ticks <=4 ms and timer gaps <=40 ms in the damage intervals; an earlier interval had a 101 ms gap. The reported one-second hitch has not yet been reproduced and is not considered fixed. Timing counters reset after each report.
+The current diagnostic build reports maximum drawing time, game-tick time, timer gap (all milliseconds), damage-event count, and clock skips every 105 game ticks. A hardware capture with seven damage events showed game ticks <=4 ms and timer gaps <=40 ms in the damage intervals; an earlier interval had a 101 ms gap. The reported one-second hitch has not yet been reproduced on hardware and is not considered fixed. Timing counters reset after each report.
+
+In the Emery emulator, `time_ms()` jumps by about one second around each second boundary (about two `skips` per report). Earlier builds simulated each jump as a 120 ms burst of game ticks, so the emulated game ran roughly 20% fast in one-second pulses. The frame timer now counts an implausible jump (backward, or more than 500 ms) as one nominal frame. Whether hardware shows the same clock behaviour is unverified; check the `skips` counter in a hardware log.
 
 ## Release preparation milestone
 
