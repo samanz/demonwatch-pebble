@@ -28,7 +28,13 @@ The Emery emulator was used to exercise movement, pickup, door use, killing enem
 
 The renderer uses 120 x 114 logical pixels scaled to a 200 x 190 view, plus a health/ammo/armor HUD. Engine simulation runs at 35 ticks per second. Physical Emery hardware running PebbleOS 4.38.2 has now launched successfully and logged movement. Extended gameplay, battery use, and touch feel still need hardware testing. There is no sound, save system, full E1M1, or arbitrary WAD support. This is a playable prototype, not an App Store release.
 
-SDK measurements: resources 145,013 bytes; static RAM footprint 64,138 bytes; initial available heap 66,934 bytes. Runtime free heap in this arena is approximately 10 KB. The loaded image (64,140 bytes) must fit the SDK header's 65,535-byte field, so fewer than 1.4 KB of code/static data headroom remain.
+SDK measurements: resources 145,013 bytes; static RAM footprint 58,317 bytes; initial available heap 72,755 bytes. Runtime free heap in this arena is approximately 16 KB. The loaded image (58,320 bytes) must fit the SDK header's 65,535-byte field, leaving about 7.2 KB of code/static-data headroom.
+
+Space-saving conventions (keep them when adding content):
+- `states[]` stores each action as an 8-bit index into `actionfuncs[]` and is packed to 8 bytes per state. Its fields must stay in the same order as the positional initializers in `info.c`; `tests/test_info.c` checks every index is in range.
+- `sprnames` is an inline `char[][5]` table; function-pointer and string-pointer tables cost extra because position-independent code relocates them into RAM.
+- Demo playback, SRAM save/load, the title demo loop, and engine `printf` progress messages are compiled out under `PEBBLE_EMERY`.
+- Scratch tables needed only at startup (such as the sprite-frame table) are heap-allocated and freed.
 
 Map lumps (THINGS through BLOCKMAP after each `E1Mx` marker) are released on every level load, so additional maps do not accumulate in the 24 KB Doom zone. Global lumps (textures, colormap) stay resident; sprite and wall patches stream through one scratch buffer.
 
@@ -57,7 +63,9 @@ gcc -std=c11 -g -fsanitize=address,undefined tests/test_ascii.c src/pebble/ascii
 ./work/test_ascii
 ```
 
-Create `work/` before running native tests. `tools/check_playthrough.py` drives a freshly installed emulator app through all three rooms to the exit switch, saves screenshots and logs there, and checks the log for the level-complete state change (`state 1 map 1`). `tools/check_menus.py` captures menu and settings-persistence screenshots.
+`sh tools/check_all.sh` builds the app and runs all of the above plus the `tests/test_info.c` table check; add `--emulator` to include the playthrough.
+
+Create `work/` before running native tests. `tools/check_playthrough.py` levels the emulator accelerometer, then steers a freshly installed app from spawn to the exit switch using the logged player position (opening doors, fighting and retrying when blocked), saves screenshots and logs in `work/`, and checks for the level-complete state change (`state 1 map 1`). Its bot shoots without aiming and can die in combat on medium skill, so a failure reading "Player died" is not by itself an engine regression. `tools/check_menus.py` captures menu and settings-persistence screenshots.
 
 The project is a git repository; on this machine git is available inside WSL, not on Windows.
 

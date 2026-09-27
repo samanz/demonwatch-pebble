@@ -1,59 +1,115 @@
-import subprocess,sys,time
+"""Play the arena in the Emery emulator from spawn to the exit switch.
+
+Steers by the player position the app logs every 105 tics: at each waypoint
+it uses (opens the door ahead), walks, and fights and retries when blocked.
+Saves screenshots and the log in work/. Run from the project root.
+"""
+import re
+import subprocess
+import sys
+import time
 from pathlib import Path
-cmd=[sys.executable,'-u','tools/run_pebble.py']
-# Relaunch app cleanly
-subprocess.run(cmd+['install','--emulator','emery','build/pdoom.pbw'],check=True,timeout=30,stdout=subprocess.DEVNULL)
+
+cmd = [sys.executable, '-u', 'tools/run_pebble.py']
+LOG = Path('work/complete-playtest.log')
+# Player x when standing against door 1, door 2, door 3, and the exit wall.
+WAYPOINTS = [(490, 'door1'), (1130, 'door2'), (1770, 'door3'), (2340, 'exit')]
+
+subprocess.run(cmd + ['install', '--emulator', 'emery', 'build/pdoom.pbw'],
+               check=True, timeout=30, stdout=subprocess.DEVNULL)
+# Hold the simulated watch flat: tilt steering is on by default, and the
+# emulator keeps whatever accelerometer state an earlier session left behind.
+subprocess.run(cmd + ['emu-accel', '--emulator', 'emery', 'gravity-z'],
+               check=True, timeout=20, stdout=subprocess.DEVNULL)
 time.sleep(2)
 
-with open('work/complete-playtest.log','w') as f:
- log=subprocess.Popen(cmd+['logs','--emulator','emery'],stdout=f,stderr=f)
- try:
-  def btn(*args): subprocess.run(cmd+['emu-button','--emulator','emery']+list(args),check=True,timeout=20,stdout=subprocess.DEVNULL)
-  def snap(name): subprocess.run(cmd+['screenshot','--emulator','emery','--no-open','work/'+name+'.png'],check=True,timeout=20,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-  # Start game from menu
-  btn('click','select');time.sleep(1)
-  # Sector 0 -> Door 1
-  # Walk holds are generous: walls and closed doors stop the player.
-  btn('--duration','2500','click','up')
-  btn('click','back')
-  time.sleep(1)
-  # Room 1 (Courtyard) combat
-  btn('push','select')
-  time.sleep(2);snap('enemy-room1')
-  time.sleep(6);btn('release','select')
-  snap('after-fight-room1')
-  # Advance across Courtyard to Door 2
-  btn('click','back');time.sleep(1)
-  btn('--duration','4500','click','up')
-  btn('click','back');time.sleep(1)
-  # Room 2 (Tech Lab) combat
-  btn('push','select');time.sleep(8);btn('release','select')
-  snap('fight-room2')
-  # Advance across Tech Lab to Door 3
-  btn('click','back');time.sleep(1)
-  btn('--duration','4500','click','up')
-  btn('click','back');time.sleep(1)
-  # Room 3 (Exit Sanctum) combat
-  btn('push','select');time.sleep(8);btn('release','select')
-  snap('fight-room3')
-  # Advance to Exit Switch wall at x=2368
-  btn('click','back');time.sleep(1)
-  btn('--duration','5000','click','up')
-  time.sleep(0.5)
-  snap('exit')
-  # Activate Exit Switch
-  btn('click','back');time.sleep(1.0)
-  snap('restart')
-  btn('--repeat','2','--interval','80','click','back')
-  time.sleep(.5);snap('pause')
-  btn('click','down');btn('click','select');time.sleep(.7);snap('pause-restart')
- finally:
-  try: btn("release","select")
-  finally: log.terminate();log.wait(timeout=5)
-report=Path('work/complete-playtest.log').read_text(errors='replace')
-print('\n'.join(x for x in report.splitlines() if 'pkjs>' not in x))
-assert 'FATAL' not in report and 'Invalid lump' not in report, 'Engine error during playthrough'
-assert 'kills' in report, 'Combat rooms must be engaged'
-assert 'pos 128,256 hp100 ammo50 kills0' in report, 'Must start with initial player state'
-assert 'state 1 map 1' in report, 'Exit switch must complete the level'
-print('PASS: expanded playthrough completed, no engine errors; inspect exit/pause screenshots for UI state')
+
+def btn(*args):
+    subprocess.run(cmd + ['emu-button', '--emulator', 'emery'] + list(args),
+                   check=True, timeout=20, stdout=subprocess.DEVNULL)
+
+
+def snap(name):
+    subprocess.run(cmd + ['screenshot', '--emulator', 'emery', '--no-open', 'work/' + name + '.png'],
+                   check=True, timeout=20, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def report():
+    return LOG.read_text(errors='replace')
+
+
+def player_x():
+    xs = re.findall(r'pos (-?\d+),', report())
+    return int(xs[-1]) if xs else 0
+
+
+def player_hp():
+    hps = re.findall(r'pos -?\d+,-?\d+ hp(-?\d+)', report())
+    return int(hps[-1]) if hps else 100
+
+
+def fight(seconds):
+    btn('push', 'select')
+    time.sleep(seconds)
+    btn('release', 'select')
+
+
+def advance(target, name, tries=6):
+    for attempt in range(tries):
+        btn('--duration', '3000', 'click', 'up')
+        time.sleep(3.3)             # wait for the next position report
+        if player_hp() <= 0:
+            snap(f'{name}-died')
+            raise AssertionError(f'Player died before {name}; last x={player_x()}')
+        if player_x() >= target:
+            return
+        # Blocked: on alternate tries shoot whatever is in the way, then
+        # reopen the door ahead (doors close ~4 s after opening) and walk
+        # straight through. Use is never pressed before walking otherwise:
+        # standing in an open door, it would close the door again.
+        snap(f'{name}-blocked-{attempt}')
+        if attempt % 2:
+            fight(4)
+        btn('click', 'back')
+        time.sleep(1.2)
+    raise AssertionError(f'Stuck before {name} (x>={target}); last x={player_x()}')
+
+
+with LOG.open('w') as f:
+    log = subprocess.Popen(cmd + ['logs', '--emulator', 'emery'], stdout=f, stderr=f)
+    try:
+        btn('click', 'select')      # New game
+        time.sleep(1)
+        for i, (target, name) in enumerate(WAYPOINTS):
+            advance(target, name)
+            if name != 'exit':
+                btn('click', 'back')    # open the door and clear the room beyond it
+                time.sleep(1)
+                fight(8)
+                snap(f'fight-room{i + 1}')
+        snap('exit')
+        btn('click', 'back')        # exit switch
+        time.sleep(1.5)
+        snap('restart')             # level-clear screen
+        btn('--repeat', '2', '--interval', '80', 'click', 'back')
+        time.sleep(.5)
+        snap('pause')
+        btn('click', 'down')
+        btn('click', 'select')
+        time.sleep(.7)
+        snap('pause-restart')
+        time.sleep(3.3)
+    finally:
+        try:
+            btn('release', 'select')
+        finally:
+            log.terminate()
+            log.wait(timeout=5)
+
+text = report()
+print('\n'.join(x for x in text.splitlines() if 'pkjs>' not in x))
+assert 'FATAL' not in text and 'Invalid lump' not in text and 'App fault' not in text, 'Engine error'
+assert 'pos 128,256 hp100 ammo50 kills0' in text, 'Must start with initial player state'
+assert re.search(r'kills[1-9]', text), 'Combat rooms must be engaged'
+assert 'state 1 map 1' in text, 'Exit switch must complete the level'
+print('PASS: spawn to exit switch, level completed, no engine errors')

@@ -434,6 +434,9 @@ void G_Ticker (void)
         case ga_newgame:
             G_DoNewGame ();
             break;
+#if !defined PEBBLE_EMERY
+        // Pebble has no demos or SRAM saves; leaving these out lets LTO
+        // drop the demo and save code.
         case ga_loadgame:
             G_DoLoadGame ();
             break;
@@ -443,6 +446,7 @@ void G_Ticker (void)
         case ga_playdemo:
             G_DoPlayDemo ();
             break;
+#endif
         case ga_completed:
             G_DoCompleted ();
             break;
@@ -452,11 +456,14 @@ void G_Ticker (void)
         case ga_worlddone:
             G_DoWorldDone ();
             break;
-        case ga_nothing:
+        default:
             break;
         }
     }
 
+#if defined PEBBLE_EMERY
+    memcpy(&_g_player.cmd, &netcmd, sizeof(ticcmd_t));
+#else
     if (!_g_demoplayback && _g_menuactive)
         _g_basetic++;  // For revenant tracers and RNG -- we must maintain sync
     else
@@ -466,6 +473,7 @@ void G_Ticker (void)
         if (_g_demoplayback)
             G_ReadDemoTiccmd ();
     }
+#endif
 
     // cph - if the gamestate changed, we may need to clean up the old gamestate
     if (_g_gamestate != prevgamestate)
@@ -507,8 +515,12 @@ void G_Ticker (void)
         F_Ticker ();
         break;
 
+#if !defined PEBBLE_EMERY
     case GS_DEMOSCREEN:
         D_PageTicker ();
+        break;
+#endif
+    default:
         break;
     }
 }

@@ -6,7 +6,13 @@
 
 #include <stddef.h>
 
+#if defined PEBBLE_EMERY
+// Engine progress messages are dropped on the watch to save image space;
+// fatal errors still reach the log through I_Error.
+#define printf(...) ((void)0)
+#else
 int printf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+#endif
 int sprintf(char *str, const char *format, ...);
 int snprintf(char *str, size_t size, const char *format, ...);
 

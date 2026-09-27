@@ -53,7 +53,9 @@ spritedef_t __far* sprites;
 static int8_t maxframe;
 
 #define MAX_SPRITE_FRAMES 29
-static spriteframe_t sprtemp[MAX_SPRITE_FRAMES];
+// Only needed while R_InitSprites runs, so it lives on the heap rather than
+// in the app image.
+static spriteframe_t *sprtemp;
 
 static int16_t firstspritelump;
 static int16_t numentries;
@@ -148,7 +150,7 @@ void R_InitSprites(void)
   struct { int16_t index, next; } __far* hash;
   int16_t i;
 
-  if (!numentries || !*sprnames)
+  if (!numentries || !sprnames[0][0])
     return;
 
   sprites = Z_MallocStatic(NUMSPRITES *sizeof(*sprites));
@@ -159,6 +161,11 @@ void R_InitSprites(void)
   // killough 1/31/98
 
   hash = Z_MallocStatic(sizeof(*hash)*numentries); // allocate hash table
+
+  extern void *malloc(size_t size); extern void free(void *ptr);
+  sprtemp = malloc(MAX_SPRITE_FRAMES * sizeof(*sprtemp));
+  if (!sprtemp)
+    I_Error("R_InitSprites: out of memory");
 
   for (i=0; i<numentries; i++)             // initialize hash table as empty
     hash[i].index = -1;
@@ -182,7 +189,7 @@ void R_InitSprites(void)
 
       if (j >= 0)
         {
-          memset(sprtemp, -1, sizeof(sprtemp));
+          memset(sprtemp, -1, MAX_SPRITE_FRAMES * sizeof(*sprtemp));
           maxframe = -1;
           do
             {
@@ -281,6 +288,8 @@ void R_InitSprites(void)
     }
 
   Z_Free(hash);           // free hash table
+  free(sprtemp);
+  sprtemp = NULL;
 }
 
 

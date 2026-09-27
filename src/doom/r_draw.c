@@ -3068,7 +3068,9 @@ void R_InitDrawTables(void)
         if (c_val == 0) {
             finetangentTable_part_4[i] = 170910304;
         } else {
-            finetangentTable_part_4[i] = (fixed_t)(((uint64_t)s_val << 16) / c_val);
+            // s_val is a 16-bit table entry, so s_val << 16 fits in 32 bits;
+            // avoiding 64-bit division keeps __udivmoddi4 out of the image.
+            finetangentTable_part_4[i] = (fixed_t)((s_val << 16) / c_val);
         }
     }
 }

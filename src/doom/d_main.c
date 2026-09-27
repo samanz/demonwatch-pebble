@@ -487,7 +487,9 @@ static void D_DoomMainSetup(void)
 
     I_InitSound2();
 
+#if !defined PEBBLE_EMERY
     D_Init();
+#endif
     F_Init();
     WI_Init();
 
@@ -508,6 +510,12 @@ static void D_DoomMainSetup(void)
     printf("ST_Init: Init status bar.\n");
     ST_Init();
 
+#if defined PEBBLE_EMERY
+    // Settings live in Pebble persistent storage and D_DoomMain starts the
+    // game directly: no SRAM settings, title loop or demos.
+    _g_fps_show = false;
+}
+#else
     G_LoadSettings();
 
     _g_fps_show = false;
@@ -527,6 +535,7 @@ static void D_DoomMainSetup(void)
         D_StartTitle();                 // start up intro loop
     }
 }
+#endif
 
 //
 // D_DoomMain

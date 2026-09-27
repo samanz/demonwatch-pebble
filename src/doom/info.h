@@ -436,18 +436,22 @@ typedef enum
  * Definition of the state (frames) structure                       *
  ********************************************************************/
 
-typedef struct
+/* Field order must match the positional initializers in info.c.
+ * Packed to 8 bytes; Cortex-M3 handles the unaligned halfword loads. */
+typedef struct __attribute__((packed))
 {
   spritenum_t sprite;       /* sprite number to show                       */
   uint16_t    frame;        /* which frame/subframe of the sprite is shown */
   int16_t     tics;         /* number of gametics this frame should last   */
-  actionf_t   action;       /* code pointer to function for action if any  */
-  statenum_t  nextstate;    /* linked list pointer to next state or zero   */
+  uint8_t     action;       /* index into actionfuncs[], 0 = no action     */
+  uint16_t    nextstate;    /* statenum_t of the next state, or S_NULL     */
 } state_t;
+_Static_assert(sizeof(state_t) == 8, "state_t packing");
 
 /* these are in info.c */
 extern const state_t  states[NUMSTATES];
-extern const char* const sprnames[]; /* 1/17/98 killough - CPhipps - const */
+extern const actionf_t actionfuncs[];
+extern const char sprnames[][5]; /* inline names: no relocated pointer table */
 
 /********************************************************************
  * Thing enumeration -- must match info.c                           *

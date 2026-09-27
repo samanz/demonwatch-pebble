@@ -5,8 +5,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdarg.h>
-extern int vsnprintf(char *, size_t, const char *, va_list);
 #undef false
 #undef true
 #include "../doom/doomdef.h"
@@ -51,11 +49,6 @@ _Noreturn void I_Error(const char *error, ...) {
     for(;;);
 }
 void exit(int code) { (void)code; for(;;); }
-
-int printf(const char *fmt, ...) {
-    app_log(100, "doom", 0, "%s", fmt);
-    return 0;
-}
 
 int puts(const char *s) {
     app_log(100, "doom", 0, "%s", s);
