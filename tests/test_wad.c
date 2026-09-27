@@ -41,7 +41,7 @@ int main(int argc,char **argv) {
     const void *g=W_GetLumpByNum(W_GetNumForName("PISGA0"));
     int before=reads;
     assert(g==W_GetLumpByNum(W_GetNumForName("PISGA0")) && before==reads);
-    assert(g==W_GetLumpByNum(W_GetNumForName("PDWALL")));
+    assert(g==W_GetLumpByNum(W_GetNumForName("PWALL")));
     assert(a==W_GetLumpByNum(lines) && !memcmp(a,snapshot,n));
     unsigned char *copy=malloc(n); W_ReadLumpByNum(lines,copy);
     assert(!memcmp(copy,snapshot,n));

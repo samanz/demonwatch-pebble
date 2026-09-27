@@ -24,7 +24,7 @@
         {
           "type": "raw",
           "name": "E1M1_WAD",
-          "file": "arena.pbl"
+          "file": "pdoom.pbl"
         },
         {
           "type": "bitmap",

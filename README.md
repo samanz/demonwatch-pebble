@@ -1,6 +1,6 @@
 # pDOOM 0.2 — release preparation
 
-Native Doom64KB-derived game for Pebble Time 2 (Emery), built with Pebble SDK 4.33.1. This alpha contains one original three-room arena, two working doors, four enemies, armor, shotgun, ammunition, and an exit switch. Assets are adapted from Freedoom 0.13.0. No commercial Doom WAD is required or bundled.
+Native Doom64KB-derived game for Pebble Time 2 (Emery), built with Pebble SDK 4.33.1. It contains a three-map episode of original Doom-style levels (E1M1 Hangar Gate, E1M2 Toxin Refinery, E1M3 Command Center) with doors, key doors, a lift, stairs, nukage, windows and outdoor areas; zombiemen, shotgun guys, imps and demons; and the fist, pistol, shotgun and chaingun. Art is adapted from Freedoom 0.13.0. No commercial Doom WAD is required or bundled.
 
 ## Install and play
 
@@ -20,7 +20,7 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - After death: Select retries the current level.
 - After the exit switch: Select continues to the next map (E1M2, E1M3, … when present, keeping inventory). After the last map, Select starts a new game.
 
-Walk toward the door, press Back, fight through both combat rooms, then use the switch on the far wall. The door closes automatically and can be reopened.
+Doors open with Back and close again after a few seconds. Key doors (blue, yellow stripes beside the door) need the matching keycard. A lift is used by pressing Back at its side. Each map ends at an exit switch.
 
 ## Verified scope and limits
 
@@ -36,36 +36,42 @@ Space-saving conventions (keep them when adding content):
 - Demo playback, SRAM save/load, the title demo loop, and engine `printf` progress messages are compiled out under `PEBBLE_EMERY`.
 - Scratch tables needed only at startup (such as the sprite-frame table) are heap-allocated and freed.
 
-Map lumps (THINGS through BLOCKMAP after each `E1Mx` marker) are released on every level load, so additional maps do not accumulate in the 24 KB Doom zone. Global lumps (textures, colormap) stay resident; sprite and wall patches stream through one scratch buffer.
+Memory: the Doom zone is 30 KB (falling back to 26/22/18 KB if the heap is short). About 4 KB of it holds permanent data (sprite frame tables store only the front view; TEXTURE1 carries names only), leaving about 26.6 KB per level. Map lumps (THINGS through BLOCKMAP after each `E1Mx` marker) are released on every level load. Global lumps stay resident; sprite and wall patches stream through one scratch buffer. The app log reports free zone memory (`zone`) every 105 tics and on every game-state change.
+
+## Making levels
+
+Levels are Python scripts in `tools/levels/` (`e1m1.py` ...) using `tools/doommap.py`: each sector is a polygon with floor/ceiling heights, flat colours (6-bit Pebble colour codes, `SKY` or `NUKAGE`), light, special, tag and a wall texture; holes make pillars and pools. Shared edges become two-sided lines automatically (T-junctions are split), upper/lower textures are chosen from the heights, and helpers add doors (`m.door`, including key doors) and per-edge specials/textures (`m.edge`). `tools/build_wad.py` runs a design check (things inside the map and clear of walls; exit reachable from the start through doors, lifts, stairs and keys), builds nodes with zdbsp, converts to Doom64KB's compact lumps (`tools/convert_map.py`), and fails if a map exceeds the format limits or the per-level zone budget. Texture names come from `tools/assets.py`.
+
+zdbsp is installed without root: `apt-get download zdbsp && dpkg-deb -x zdbsp_*.deb ~/.local/zdbsp` (or set `ZDBSP`).
 
 ## Build
 
 Use Linux/WSL with Pebble SDK 4.33.1 and its ARM toolchain available on PATH:
 
 ```sh
-python3 tools/build_arena.py
+python3 tools/build_wad.py
 pebble build
 python3 tools/verify_pbw.py build/pdoom.pbw
 pebble install --emulator emery
 ```
 
-`tools/run_pebble.py` is a convenience wrapper for the original development machine's SDK paths; adapt it for another machine or use `pebble` directly. The checked-in Freedoom art pack makes arena generation independent of downloading the original release.
+`tools/run_pebble.py` is a convenience wrapper for the original development machine's SDK paths; adapt it for another machine or use `pebble` directly. The checked-in Freedoom art pack makes the resource build independent of downloading the original release.
 
-To regenerate the art pack, place the official Freedoom 0.13.0 zip at `work/freedoom-0.13.0.zip`, run `python3 tools/import_freedoom.py work/freedoom-0.13.0.zip`, then regenerate the arena. Archive SHA256: `3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59`.
+To regenerate the art pack (after changing `tools/assets.py`), place the official Freedoom 0.13.0 zip at `work/freedoom-0.13.0.zip`, run `python3 tools/import_freedoom.py work/freedoom-0.13.0.zip`, then `python3 tools/build_wad.py`. Archive SHA256: `3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59`.
 
 ```sh
 python3 -m unittest discover -s tests -v
 gcc -std=c11 -g -fsanitize=address,undefined -Itests tests/test_wad.c src/pebble/pebble_wad.c -o work/test_wad
-ASAN_OPTIONS=detect_leaks=0 ./work/test_wad resources/arena.pbl
+ASAN_OPTIONS=detect_leaks=0 ./work/test_wad resources/pdoom.pbl
 gcc -std=c11 -g -fsanitize=address,undefined -DVIEWWINDOWWIDTH=120 -DVIEWWINDOWHEIGHT=114 -DFLAT_SPAN tests/test_video.c src/pebble/i_pebblev.c -o work/test_video
 ./work/test_video
 gcc -std=c11 -g -fsanitize=address,undefined tests/test_ascii.c src/pebble/ascii.c -o work/test_ascii
 ./work/test_ascii
 ```
 
-`sh tools/check_all.sh` builds the app and runs all of the above plus the `tests/test_info.c` table check; add `--emulator` to include the playthrough.
+`sh tools/check_all.sh` builds the resource file and the app and runs all of the above plus the `tests/test_info.c` table check; add `--emulator` to also visit every map in the emulator.
 
-Create `work/` before running native tests. `tools/check_playthrough.py` builds the playtest variant (`PDOOM_PLAYTEST=1 pebble build`, output in `build-playtest/`, never `build/`), levels the emulator accelerometer, then steers the app from spawn to the exit switch using the logged player position (walking, reopening doors and fighting when blocked). It saves screenshots and logs in `work/` and checks for the level-complete state change (`state 1 map 1`). The playtest variant makes the player invulnerable, immune to knockback, and able to walk through monsters, because the bot cannot aim; walls, doors, switches, pickups, and combat are otherwise unchanged. None of this is compiled into the release build. `tools/check_menus.py` captures menu and settings-persistence screenshots.
+Create `work/` before running native tests. `tools/check_maps.py` builds the playtest variant (`PDOOM_PLAYTEST=1 pebble build`, output in `build-playtest/`, never `build/`), starts a new game and, for each map, waits for it to load, looks around (tilting the simulated watch), walks, screenshots (`work/map<N>-*.png`), then warps to the exit and continues; it fails on engine errors, a missing map, or low zone memory. The emulator presses one button at a time, so the playtest variant exits the level when Down is held for 2 seconds; it also makes the player invulnerable, immune to knockback, and able to walk through monsters. None of this is compiled into the release build. `tools/smoke_map.py` is a quicker single-map look, and `tools/check_menus.py` captures menu and settings-persistence screenshots.
 
 The project is a git repository; on this machine git is available inside WSL, not on Windows.
 
@@ -75,7 +81,7 @@ Engine source is GPL-2.0; see LICENSE and original source headers. Upstream repo
 - https://github.com/FrenkelS/Doom64KB (local reference commit 058e4d4a75da7187fff3c6f357647d9f069605f7)
 - https://github.com/akiyan/genesis-DOOM64KB (local reference commit 5da4cf9d6b46e78078d208f46e52ee40c36c67b4)
 
-Freedoom artwork is distributed under its BSD license; see licenses/Freedoom-COPYING.txt and licenses/Freedoom-CREDITS.txt. Source: https://github.com/freedoom/freedoom/releases/tag/v0.13.0 . Converted sprites retain logical dimensions with reduced color/detail. Wall, door, and exit-panel textures are rescaled from Freedoom STARTAN3, BIGDOOR2, and SW1EXIT. Original arena geometry and the procedural fallback artwork used when the Freedoom art pack is absent are dedicated to CC0. The source archive includes the modified engine, port, asset generators, converted art, build configuration, and tests.
+Freedoom artwork is distributed under its BSD license; see licenses/Freedoom-COPYING.txt and licenses/Freedoom-CREDITS.txt. Source: https://github.com/freedoom/freedoom/releases/tag/v0.13.0 . Converted sprites retain logical dimensions with reduced color/detail. Wall textures are rescaled from the Freedoom textures listed in `tools/assets.py`. The original level geometry (`tools/levels/`) and the procedural fallback artwork used when the Freedoom art pack is absent are dedicated to CC0. The source archive includes the modified engine, port, asset generators, converted art, build configuration, and tests.
 
 ## Hardware startup fix (2026-09-27)
 

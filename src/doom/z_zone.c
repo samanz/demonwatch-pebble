@@ -239,7 +239,7 @@ static uint32_t Z_GetLargestFreeBlockSize(void)
 	return largestFreeBlockSize;
 }
 
-static uint32_t Z_GetTotalFreeMemory(void)
+uint32_t Z_GetTotalFreeMemory(void)
 {
 	uint32_t totalFreeMemory = 0;
 

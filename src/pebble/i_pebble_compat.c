@@ -21,10 +21,11 @@ static uint32_t s_zone_size = 0;
 
 uint8_t __far* I_ZoneBase(uint32_t *heapSize) {
     if (!s_zone) {
-        *heapSize = 24 * 1024;
-        uint8_t *raw = (uint8_t*)malloc(*heapSize + 32);
-        if (!raw) {
-            *heapSize = 18 * 1024;
+        // Largest first; the level data of bigger maps lives here.
+        static const uint16_t sizes_kb[] = {30, 26, 22, 18};
+        uint8_t *raw = NULL;
+        for (unsigned i = 0; !raw && i < sizeof(sizes_kb) / sizeof(sizes_kb[0]); ++i) {
+            *heapSize = sizes_kb[i] * 1024u;
             raw = (uint8_t*)malloc(*heapSize + 32);
         }
         if (!raw) I_Error("Cannot allocate Doom zone");

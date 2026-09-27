@@ -11,6 +11,7 @@
 #include "../doom/globdata.h"
 #include "../doom/i_system.h"
 #include "../doom/w_wad.h"
+#include "../doom/z_zone.h"
 
 static Window *s_main_window;
 static Layer *s_canvas_layer;
@@ -309,10 +310,22 @@ static void frame_timer_callback(void *data) {
             }
             uint32_t tick_start=now_ms();
             int old_health=_g_player.health;
+#if defined PDOOM_PLAYTEST
+            // Playtest build only: holding Down for 2 s exits the level, so the
+            // emulator check (which can press one button at a time) can visit
+            // every map.
+            static int s_down_tics;
+            s_down_tics=s_down ? s_down_tics+1 : 0;
+            if(s_down_tics==2*TICRATE && _g_gamestate==GS_LEVEL) {
+                APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST warp");
+                G_ExitLevel();
+            }
+#endif
             G_BuildTiccmd(); G_Ticker(); ++_g_gametic;
             if(_g_gamestate!=s_last_state) {
                 s_last_state=_g_gamestate;
-                APP_LOG(APP_LOG_LEVEL_INFO,"state %d map %d",_g_gamestate,_g_gamemap);
+                APP_LOG(APP_LOG_LEVEL_INFO,"state %d map %d zone%lu",_g_gamestate,_g_gamemap,
+                    (unsigned long)Z_GetTotalFreeMemory());
             }
             if(_g_player.health<old_health) {
                 ++s_hits;
@@ -321,9 +334,10 @@ static void frame_timer_callback(void *data) {
             int32_t tick_ms=(int32_t)(now_ms()-tick_start);
             if(tick_ms>(int32_t)s_max_tick_ms) s_max_tick_ms=tick_ms;
             if(_g_gametic%105==0 && _g_player.mo) {
-                APP_LOG(APP_LOG_LEVEL_INFO,"tick %ld pos %ld,%ld hp%d ammo%d kills%d frames%u heap%lu",_g_gametic,
+                APP_LOG(APP_LOG_LEVEL_INFO,"tick %ld pos %ld,%ld hp%d ammo%d kills%d frames%u heap%lu zone%lu",_g_gametic,
                     _g_player.mo->x>>16,_g_player.mo->y>>16,_g_player.health,
-                    _g_player.ammo[0],_g_player.killcount,s_frames,(unsigned long)heap_bytes_free());
+                    _g_player.ammo[0],_g_player.killcount,s_frames,(unsigned long)heap_bytes_free(),
+                    (unsigned long)Z_GetTotalFreeMemory());
                 APP_LOG(APP_LOG_LEVEL_INFO,"timing draw%lu tick%lu gap%lu hits%u skips%u",(unsigned long)s_max_draw_ms,(unsigned long)s_max_tick_ms,(unsigned long)s_max_gap_ms,s_hits,s_clock_skips);
                 s_frames=s_hits=s_clock_skips=0; s_max_draw_ms=s_max_tick_ms=s_max_gap_ms=0;
             }
@@ -355,6 +369,8 @@ static void touch_handler(const TouchEvent *e,void *context) {
     }
 }
 static void restart(void) {
+    APP_LOG(APP_LOG_LEVEL_INFO,"new game: zone%lu heap%lu",(unsigned long)Z_GetTotalFreeMemory(),
+        (unsigned long)heap_bytes_free());
 #if defined PDOOM_PLAYTEST
     APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST build: player invulnerable");
 #endif

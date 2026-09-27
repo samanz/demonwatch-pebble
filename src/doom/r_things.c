@@ -55,7 +55,7 @@ static int8_t maxframe;
 #define MAX_SPRITE_FRAMES 29
 // Only needed while R_InitSprites runs, so it lives on the heap rather than
 // in the app image.
-static spriteframe_t *sprtemp;
+static spriteframe_full_t *sprtemp;
 
 static int16_t firstspritelump;
 static int16_t numentries;
@@ -282,7 +282,17 @@ void R_InitSprites(void)
                   }
               // allocate space for the frames present and copy sprtemp to it
               sprites[i].spriteframes = Z_MallocStatic(maxframe * sizeof(spriteframe_t));
+#if defined PEBBLE_EMERY
+              // Keep the front view only (see spriteframe_t in r_defs.h).
+              for (frame = 0; frame < maxframe; frame++)
+                {
+                  sprites[i].spriteframes[frame].lump[0]  = sprtemp[frame].lump[0];
+                  sprites[i].spriteframes[frame].flipmask = sprtemp[frame].flipmask & 1;
+                  sprites[i].spriteframes[frame].rotate   = false;
+                }
+#else
               _fmemcpy(sprites[i].spriteframes, sprtemp, maxframe*sizeof(spriteframe_t));
+#endif
             }
         }
     }

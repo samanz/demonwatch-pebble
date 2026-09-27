@@ -360,7 +360,21 @@ typedef struct
   //  we might as well insert the same name eight times.
   boolean rotate;
 
+} spriteframe_full_t;
+
+#if defined PEBBLE_EMERY
+// pDOOM packs only the front view (rotation 0) of every sprite, so resident
+// frames keep a single lump: 4 bytes instead of 18 per frame. rotate is
+// always false, so the renderer only ever reads lump[0].
+typedef struct
+{
+  int16_t lump[1];
+  byte flipmask;
+  boolean rotate;
 } spriteframe_t;
+#else
+typedef spriteframe_full_t spriteframe_t;
+#endif
 
 
 //

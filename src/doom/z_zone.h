@@ -38,6 +38,7 @@ void __far* Z_CallocLevSpec(uint16_t size);
 void Z_Free(const void __far* ptr);
 void Z_FreeTags(void);
 void Z_CheckHeap(void);
+uint32_t Z_GetTotalFreeMemory(void);
 
 boolean Z_EqualNames(const char __far* farName, const char* nearName);
 
