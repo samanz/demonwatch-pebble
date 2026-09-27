@@ -85,6 +85,14 @@ uint16_t W_LumpLength(int16_t num) { return checked(num)->size; }
 void W_ReadLumpByNum(int16_t num, void *dest) {
     lump_t *l=checked(num); read_exact(l->offset,dest,l->size);
 }
+/* Part of a lump (used to stream sounds); returns the bytes read. */
+uint16_t W_ReadLumpRange(int16_t num, uint16_t offset, void *dest, uint16_t size) {
+    lump_t *l=checked(num);
+    if (offset >= l->size) return 0;
+    if (size > l->size - offset) size = l->size - offset;
+    read_exact(l->offset + offset, dest, size);
+    return size;
+}
 const void *W_GetLumpByNum(int16_t num) {
     lump_t *l=checked(num);
     if (graphics_lump(num)) {

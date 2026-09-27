@@ -132,9 +132,16 @@ with LOG.open('w') as f:
                 failures.append(f'map {n} did not load')
                 break
             look_around(n)
+            if n == 1:
+                pause_menu_pick(1)          # Map
+                time.sleep(0.5)
+                snap('map1-automap')
+                btn('click', 'back')        # map -> pause menu
+                btn('click', 'back')        # pause -> game
+                time.sleep(0.5)
             if n == 2 and MAPS >= 3:
                 # Quit, relaunch, Continue: map 2 again from the checkpoint.
-                pause_menu_pick(4)          # Quit
+                pause_menu_pick(5)          # Quit
                 time.sleep(1)
                 if not launch():
                     failures.append('no Continue after quitting on map 2')
@@ -149,7 +156,7 @@ with LOG.open('w') as f:
                 snap('map2-continued')
             if n == 3:
                 start = mark()
-                pause_menu_pick(1)          # Restart level
+                pause_menu_pick(2)          # Restart level
                 if not wait_for(r'checkpoint restored: map 3', 10, start):
                     failures.append('Restart level did not restore the checkpoint')
                     break

@@ -7,6 +7,8 @@ offsets preserved, detail halved (2x2 sampling). Wall patches: assets.PATCHES,
 composed from Freedoom textures, scaled to the listed width and tiled to 128
 rows.
 
+Sounds: assets.SOUNDS, converted to 8 kHz signed 8-bit PCM (convert_sound).
+
 Colour: the Pebble has 4 levels per channel, which flattens Doom's greys and
 browns into one grey. Each colour gets a mild saturation/brightness boost and
 a 2x2 ordered dither per 2x2 texel block (texel pairs are stored once, so the
@@ -17,7 +19,30 @@ import struct as st
 import sys
 import zipfile
 
-from assets import PATCHES, ROOT, WEAPON_SPRITES, patch, read_lumps, sprite_frames
+from assets import PATCHES, ROOT, SOUNDS, WEAPON_SPRITES, patch, read_lumps, sprite_frames
+
+
+def convert_sound(data, max_seconds, rate_out=8000):
+    """DMX sound lump (8-bit unsigned) -> 8 kHz signed PCM, trailing silence
+    trimmed, capped at max_seconds with a 40 ms fade-out."""
+    fmt, rate, count = st.unpack_from('<HHI', data)
+    assert fmt == 3, 'not a DMX sound lump'
+    samples = data[8 + 16:8 + count - 16]   # skip the 16-byte pads
+    n_out = int(len(samples) * rate_out / rate)
+    out = []
+    for i in range(n_out):
+        pos = i * rate / rate_out
+        j = int(pos)
+        a = samples[j] - 128
+        b = (samples[j + 1] - 128) if j + 1 < len(samples) else a
+        out.append(a + (b - a) * (pos - j))
+    while out and abs(out[-1]) < 3:
+        out.pop()
+    out = out[:int(max_seconds * rate_out)]
+    fade = min(len(out), int(0.04 * rate_out))
+    for k in range(fade):
+        out[len(out) - fade + k] *= (fade - k) / fade
+    return bytes(int(max(-128, min(127, round(v)))) & 0xFF for v in out)
 
 
 def decode(data):
@@ -121,6 +146,9 @@ def main(path):
             sy = (y // 2 * 2) % th
             return colour(canvas[sy][min(sx, tw - 1)], x // 2, y // 2)
         art.append((name, patch(width, 128, 0, 0, pixel)))
+
+    for name, seconds in SOUNDS.items():
+        art.append((name, convert_sound(wad[name], seconds)))
 
     out = bytearray(b'IWAD' + bytes(8))
     directory = []

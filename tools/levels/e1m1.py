@@ -4,7 +4,7 @@ Entry room -> door -> brown corridor with a window onto the courtyard ->
 stairs up -> outdoor courtyard around a nukage pool -> door -> octagonal
 computer room -> door -> exit alcove.
 """
-from doommap import Map, NUKAGE, SKY, AMBUSH, SKILLS, UNPEG_BOTTOM
+from doommap import AMBUSH, HARD, Map, NH, NUKAGE, SKILLS, SKY, UNPEG_BOTTOM
 
 # Doomednums used below.
 PLAYER, ZOMBIE, SHOTGUY, IMP = 1, 3004, 9, 3001
@@ -73,24 +73,29 @@ def build():
     m.thing(64, 272, LAMP)
     m.thing(320, 272, LAMP)
     m.thing(96, 64, CLIP)
-    m.thing(192, 520, ZOMBIE, angle=270)
+    m.thing(192, 520, ZOMBIE, angle=270, flags=NH)
     m.thing(192, 700, ZOMBIE, angle=270, flags=SKILLS | AMBUSH)
     m.thing(160, 736, SHOTGUN)
     m.thing(224, 736, SHELLS)
-    m.thing(460, 330, IMP, angle=180)
-    m.thing(480, 820, ZOMBIE, angle=270)
-    m.thing(680, 800, IMP, angle=270)
-    m.thing(940, 780, SHOTGUY, angle=180)
-    m.thing(960, 300, IMP, angle=90, flags=SKILLS | AMBUSH)
+    m.thing(460, 330, IMP, angle=180, flags=SKILLS)
+    m.thing(480, 820, ZOMBIE, angle=270, flags=NH)
+    m.thing(680, 800, IMP, angle=270, flags=HARD)
+    m.thing(940, 780, SHOTGUY, angle=180, flags=NH)
+    m.thing(960, 300, IMP, angle=90, flags=HARD | AMBUSH)
     m.thing(420, 300, STIM)
     m.thing(980, 860, SHELLS)
     m.thing(896, 460, ARMOR)
     m.thing(1100, 480, TECHCOL)
     m.thing(1300, 480, TECHCOL)
-    m.thing(1200, 520, SHOTGUY, angle=180, flags=SKILLS | AMBUSH)
-    m.thing(1300, 660, ZOMBIE, angle=180)
-    m.thing(1110, 670, IMP, angle=0)
+    m.thing(1200, 520, SHOTGUY, angle=180, flags=NH | AMBUSH)
+    m.thing(1300, 660, ZOMBIE, angle=180, flags=SKILLS)
+    m.thing(1110, 670, IMP, angle=0, flags=HARD)
     m.thing(1200, 600, MEDI)
     m.thing(1160, 760, BONUS)
     m.thing(1240, 760, BONUS)
+    # Hard-only extras and extra health on every difficulty.
+    m.thing(800, 300, IMP, angle=180, flags=HARD)
+    m.thing(1300, 560, IMP, angle=180, flags=HARD)
+    m.thing(200, 600, STIM)
+    m.thing(420, 860, MEDI)
     return m

@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-from assets import sprite_frames  # noqa: E402
+from assets import SOUNDS, sprite_frames  # noqa: E402
 
 ORDER = ['THINGS', 'LINEDEFS', 'SIDEDEFS', 'SEGS', 'SSECTORS', 'NODES', 'SECTORS', 'REJECT', 'BLOCKMAP']
 SIZES = {'THINGS': 8, 'LINEDEFS': 31, 'SIDEDEFS': 7, 'SEGS': 18, 'SSECTORS': 4, 'NODES': 28, 'SECTORS': 12}
@@ -77,10 +77,9 @@ class Assets(unittest.TestCase):
                 self.assertEqual(len(players), 1)
 
     def test_patches_and_engine_frames(self):
-        start = next(i for i, (n, _) in enumerate(self.lumps) if n == 'S_START')
-        pstart = next(i for i, (n, _) in enumerate(self.lumps) if n == 'P_START')
-        pend = next(i for i, (n, _) in enumerate(self.lumps) if n == 'P_END')
-        patches = self.lumps[pstart + 1:pend] + self.lumps[start + 1:-1]
+        index = {n: i for i, (n, _) in enumerate(self.lumps) if n in ('S_START', 'S_END', 'P_START', 'P_END')}
+        patches = (self.lumps[index['P_START'] + 1:index['P_END']]
+                   + self.lumps[index['S_START'] + 1:index['S_END']])
         for name, patch in patches:
             width, height, _, _ = struct.unpack_from('<hhhh', patch)
             for x in range(width):
@@ -93,6 +92,13 @@ class Assets(unittest.TestCase):
         for frame in sprite_frames():
             self.assertIn(frame, self.named)
         self.assertIn('POL5A0', self.named)  # A closing door can crush a corpse into gibs.
+
+    def test_sounds(self):
+        # 8 kHz signed PCM streamed by src/pebble/i_pebbles.c; lumps must fit
+        # the uint16 offsets W_ReadLumpRange uses.
+        for name in SOUNDS:
+            self.assertIn(name, self.named)
+            self.assertTrue(0 < len(self.named[name]) < 65536, name)
 
     def test_texture_references(self):
         table = self.named['TEXTUREP']

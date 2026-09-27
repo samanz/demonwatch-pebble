@@ -126,12 +126,13 @@ static uint8_t viewangletox(int16_t va) {
 }
 
 
-static angle_t* tantoangleTable = NULL;
-
+// Stored as 16-bit angles (4 KB of heap instead of 8 KB). The 32-bit form
+// used by gameplay (R_PointToAngle3) loses only the low 16 bits, 1/65536 of
+// a turn, which has no visible or playable effect.
 static angle16_t* tantoangle16Table = NULL;
 
-#define tantoangle(t) tantoangleTable[t]
-#define tantoangle16(t) tantoangle16Table[(t)*2]
+#define tantoangle(t) ((angle_t)tantoangle16Table[t] << 16)
+#define tantoangle16(t) tantoangle16Table[t]
 
 
 static uint16_t* finetangentTable_part_3 = NULL;
@@ -3041,18 +3042,12 @@ void R_InitDrawTables(void)
 
     if (!openings) openings = malloc(MAXOPENINGS * sizeof(*openings));
     if (!_s_drawsegs) _s_drawsegs = (drawseg_t*)malloc(MAXDRAWSEGS * sizeof(drawseg_t));
-    if (!tantoangleTable) tantoangleTable = (angle_t*)malloc(2049 * sizeof(angle_t));
+    if (!tantoangle16Table) tantoangle16Table = (angle16_t*)malloc(2049 * sizeof(angle16_t));
 
     if (!finetangentTable_part_3) finetangentTable_part_3 = (uint16_t*)malloc(1024 * sizeof(uint16_t));
     if (!finetangentTable_part_4) finetangentTable_part_4 = (fixed_t*)malloc(1024 * sizeof(fixed_t));
 
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    tantoangle16Table = ((angle16_t*)&tantoangleTable[0]);
-#else
-    tantoangle16Table = ((angle16_t*)&tantoangleTable[0]) + 1;
-#endif
-
-    if (!openings || !_s_drawsegs || !tantoangleTable || !finetangentTable_part_3 || !finetangentTable_part_4)
+    if (!openings || !_s_drawsegs || !tantoangle16Table || !finetangentTable_part_3 || !finetangentTable_part_4)
         I_Error("Render table allocation");
 
     // 1. CORDIC for tantoangleTable
@@ -3080,7 +3075,7 @@ void R_InitDrawTables(void)
             x = nx;
             y = ny;
         }
-        tantoangleTable[t] = angle;
+        tantoangle16Table[t] = angle >> 16;
     }
 
     // 3. finetangentTable_part_3 & part_4 from finesineTable_part_1

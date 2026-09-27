@@ -20,3 +20,6 @@ work/
 
 # Backups
 *.bak
+
+# Release packages (tools/package_release.py)
+dist/

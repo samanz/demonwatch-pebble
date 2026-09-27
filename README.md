@@ -11,11 +11,14 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - Back once: use door or exit switch.
 - Hold Select and click Back: cycle owned weapons.
 - Tilt the watch left / right: turn (default) or strafe, chosen in Settings.
-- Double Back: open the pause menu. Up/Down choose Resume, Restart level, Settings, Controls, or Quit; Select confirms. Back resumes.
+- Double Back: open the pause menu. Up/Down choose Resume, Map, Restart level, Settings, Controls, or Quit; Select confirms. Back resumes.
+- Map (pause menu): a north-up line map of the walls you have seen, centred on you with a green arrow (dot = facing). Walls white, steps and ledges orange, doors and switches yellow, the exit red. Up/Down zoom; Back returns.
 - Launch opens a title menu: Continue (when a checkpoint exists), New game, Settings, Controls, About (version, licences and credits). New game asks for a difficulty: Easy (Doom's "too young to die": half damage, double ammo), Normal, or Hard; the choice is remembered.
 - Checkpoints: entering a level (new game or next map) saves the map, difficulty and inventory. Continue resumes there after quitting; dying and the pause menu's "Restart level" reload the level with that inventory (health at least 50). Keys are per level, as in Doom. Finishing the episode clears the checkpoint.
+- Difficulty changes the monsters: Easy has about 40% of Normal+Hard's, Normal about 70%, Hard all of them plus a few extras; every difficulty gets the same health pickups.
+- Sound effects: Freedoom's pistol, shotgun, door, switch/lift, item, pain and death sounds, streamed from the resource file at 8 kHz through the watch speaker (one at a time; distant sounds are quieter or dropped). The watch's own mute and Quiet Time silence them.
 - If the engine hits a fatal error, an error page replaces the game (Back exits) instead of the app freezing.
-- Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), and haptics (a buzz when you take damage). There is no music.
+- Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), sound effects, and haptics (a buzz when you take damage). There is no music.
 - Losing app focus clears held inputs and pauses gameplay.
 - Hold Back: system exit.
 - Touch: tap the screen to act: it uses a door, switch or lift straight ahead (within Doom's 64-unit use range), and otherwise fires one shot; an already open door counts as nothing ahead, so tapping in a doorway fires. On the death and level-end screens a tap moves on like Select. Drag horizontally to turn; touch and hold (half a second) to cycle weapons.
@@ -30,7 +33,7 @@ The Emery emulator was used to exercise movement, pickup, door use, killing enem
 
 The renderer uses 120 x 114 logical pixels scaled to a 200 x 190 view, plus a health/ammo/armor HUD with keycard squares (blue, yellow, red) at the right edge. Engine hint and pickup messages ("You need a blue key...", "Picked up a shotgun.") appear at the top for 2 seconds; the level-end screen shows kills and time. Sector lighting follows Doom64KB: each sector's light level picks one of 32 64-entry light tables (lights of 160 and above are full bright, 128 dim, 96 dark), horizontal and vertical walls get Doom's fake contrast, gun flashes brighten, and flicker/strobe/glow sector specials animate. Floors and ceilings are solid colours; the sky is a flat blue-grey. Freedoom art is converted with a mild colour boost and a 2x2 ordered dither so greys and browns keep their shading on the 64-colour display. Engine simulation runs at 35 ticks per second. Physical Emery hardware running PebbleOS 4.38.2 has now launched successfully and logged movement. Extended gameplay, battery use, and touch feel still need hardware testing. There is no sound, save system, full E1M1, or arbitrary WAD support. This is a playable prototype, not an App Store release.
 
-SDK measurements: resources 217,189 bytes (of 256 KB); initial available heap 69,970 bytes. The loaded image (61,104 bytes) must fit the SDK header's 65,535-byte field, leaving about 4.4 KB of code/static-data headroom.
+SDK measurements: resources 244,457 bytes (of 256 KB); initial available heap 67,197 bytes, about 9 KB free during play. The loaded image (63,876 bytes) must fit the SDK header's 65,535-byte field, leaving only about 1.6 KB of code/static-data headroom: new features need matching savings first.
 
 Space-saving conventions (keep them when adding content):
 - `states[]` stores each action as an 8-bit index into `actionfuncs[]` and is packed to 8 bytes per state. Its fields must stay in the same order as the positional initializers in `info.c`; `tests/test_info.c` checks every index is in range.
@@ -76,6 +79,10 @@ gcc -std=c11 -g -fsanitize=address,undefined tests/test_ascii.c src/pebble/ascii
 Create `work/` before running native tests. `tools/check_maps.py` builds the playtest variant (`PDOOM_PLAYTEST=1 pebble build`, output in `build-playtest/`, never `build/`), starts a new game and, for each map, waits for it to load, looks around (tilting the simulated watch), walks, screenshots (`work/map<N>-*.png`), then warps to the exit and continues; it fails on engine errors, a missing map, or low zone memory. The emulator presses one button at a time, so the playtest variant exits the level when Down is held for 2 seconds; it also makes the player invulnerable, immune to knockback, and able to walk through monsters. None of this is compiled into the release build. `tools/smoke_map.py` is a quicker single-map look, and `tools/check_menus.py` captures menu and settings-persistence screenshots.
 
 The project is a git repository; on this machine git is available inside WSL, not on Windows.
+
+## Releasing
+
+See `store/LISTING.md` for the store text, name options and checklist. `python3 tools/package_release.py` puts the .pbw, the complete source zip (`git archive` of HEAD, as the GPL requires), store screenshots and SHA-256 sums in `dist/<version>/`.
 
 ## Attribution
 

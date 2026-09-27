@@ -47,6 +47,7 @@ const char __far* PUREFUNC W_GetNameForNum(int16_t num);
 uint16_t          PUREFUNC W_LumpLength(   int16_t num);
 const void __far*          W_GetLumpByNum( int16_t num);
 void                       W_ReadLumpByNum(int16_t num, void __far* ptr);
+uint16_t                   W_ReadLumpRange(int16_t num, uint16_t offset, void __far* ptr, uint16_t size);
 
 #define W_GetLumpByName(x)    W_GetLumpByNum(W_GetNumForName(x))
 

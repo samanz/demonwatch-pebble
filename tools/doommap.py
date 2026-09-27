@@ -24,8 +24,11 @@ NUKAGE = 'NUKAGE1'
 # Line flags (vanilla).
 BLOCKING, BLOCKMONSTERS, TWOSIDED, UNPEG_TOP, UNPEG_BOTTOM, SECRET = 1, 2, 4, 8, 16, 32
 
-# Thing option bits: easy/medium/hard skills, ambush.
-SKILLS, AMBUSH = 7, 8
+# Thing option bits: easy/medium/hard skills, ambush. Easy covers Doom's
+# first two skills (the game's Easy is sk_baby), NORMAL is sk_medium.
+EASY, NORMAL, HARD, AMBUSH = 1, 2, 4, 8
+SKILLS = EASY | NORMAL | HARD   # every difficulty
+NH = NORMAL | HARD             # Normal and Hard only
 
 
 def colour(r, g, b):
@@ -295,11 +298,12 @@ def check(m):
     elif not exits & reached:
         problems.append(f'exit not reachable (reached sectors {sorted(reached)}, keys {sorted(keys)})')
     monsters = [t for t in m.things if t[3] in (3004, 9, 3001, 3002, 58, 3003)]
+    per_skill = '/'.join(str(sum(1 for t in monsters if t[4] & bit)) for bit in (EASY, NORMAL, HARD))
     unreachable = [t for t in m.things if sector_at(t[0], t[1]) and sector_at(t[0], t[1]).index not in reached]
     if problems:
         raise ValueError(f'{m.name}: ' + '; '.join(problems))
     return (f'{len(reached)}/{len(m.sectors)} sectors reachable, keys {sorted(keys) or "none"}, '
-            f'{len(monsters)} monsters, {len(unreachable)} things out of reach')
+            f'monsters easy/normal/hard {per_skill}, {len(unreachable)} things out of reach')
 
 
 def _inside(poly, x, y):

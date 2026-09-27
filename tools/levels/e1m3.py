@@ -4,7 +4,7 @@ Raised start room -> stairs down into an outdoor arena with a guarded
 pedestal -> west armoury (yellow key on a dais, demons) -> back across the
 arena to the yellow door -> control room with pillars -> exit.
 """
-from doommap import Map, SKY, AMBUSH, SKILLS
+from doommap import AMBUSH, HARD, Map, NH, SKILLS, SKY
 
 PLAYER, ZOMBIE, SHOTGUY, IMP, DEMON = 1, 3004, 9, 3001, 3002
 YELLOWKEY = 6
@@ -70,15 +70,15 @@ def build():
     m.thing(40, 40, LAMP)
     m.thing(280, 40, LAMP)
     # Arena.
-    m.thing(-120, 520, ZOMBIE, angle=90)
-    m.thing(440, 520, ZOMBIE, angle=90)
-    m.thing(-150, 900, SHOTGUY, angle=270)
-    m.thing(450, 900, SHOTGUY, angle=270)
-    m.thing(128, 672, IMP, angle=270)
-    m.thing(192, 672, IMP, angle=270)
-    m.thing(-40, 960, IMP, angle=270, flags=SKILLS | AMBUSH)
-    m.thing(360, 960, IMP, angle=270, flags=SKILLS | AMBUSH)
-    m.thing(160, 900, DEMON, angle=270)
+    m.thing(-120, 520, ZOMBIE, angle=90, flags=SKILLS)
+    m.thing(440, 520, ZOMBIE, angle=90, flags=NH)
+    m.thing(-150, 900, SHOTGUY, angle=270, flags=NH)
+    m.thing(450, 900, SHOTGUY, angle=270, flags=HARD)
+    m.thing(128, 672, IMP, angle=270, flags=SKILLS)
+    m.thing(192, 672, IMP, angle=270, flags=NH)
+    m.thing(-40, 960, IMP, angle=270, flags=HARD | AMBUSH)
+    m.thing(360, 960, IMP, angle=270, flags=NH | AMBUSH)
+    m.thing(160, 900, DEMON, angle=270, flags=NH)
     m.thing(-200, 700, MEDI)
     m.thing(520, 700, SHELLBOX)
     m.thing(160, 980, BONUS)
@@ -86,15 +86,20 @@ def build():
     m.thing(480, 460, CANDELABRA)
     # Armoury.
     m.thing(-512, 704, YELLOWKEY)
-    m.thing(-400, 620, DEMON, angle=0)
-    m.thing(-400, 790, DEMON, angle=0)
+    m.thing(-400, 620, DEMON, angle=0, flags=SKILLS)
+    m.thing(-400, 790, DEMON, angle=0, flags=NH)
     m.thing(-540, 800, ARMOR)
     m.thing(-330, 620, AMMOBOX)
     # Control room.
-    m.thing(820, 640, SHOTGUY, angle=180, flags=SKILLS | AMBUSH)
-    m.thing(820, 770, SHOTGUY, angle=180)
-    m.thing(660, 790, ZOMBIE, angle=180)
+    m.thing(820, 640, SHOTGUY, angle=180, flags=HARD | AMBUSH)
+    m.thing(820, 770, SHOTGUY, angle=180, flags=NH)
+    m.thing(660, 790, ZOMBIE, angle=180, flags=SKILLS)
     m.thing(860, 704, MEDI)
     m.thing(640, 610, TECHCOL)
     m.thing(640, 800, TECHCOL)
+    # Hard-only extras and extra health on every difficulty.
+    m.thing(0, 700, DEMON, angle=270, flags=HARD)
+    m.thing(700, 610, IMP, angle=180, flags=HARD)
+    m.thing(320, 460, STIM)
+    m.thing(-460, 620, MEDI)
     return m

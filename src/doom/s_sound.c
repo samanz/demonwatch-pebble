@@ -1,10 +1,13 @@
 #if defined(PEBBLE_EMERY)
 #include "s_sound.h"
+// Pebble: one sound at a time, streamed by src/pebble/i_pebbles.c; no music.
+void I_PebbleSound(int16_t sfx, boolean positioned, fixed_t x, fixed_t y);
+void I_PebbleSoundStop(void);
 int16_t snd_SfxVolume=15, snd_MusicVolume=15;
 void S_Init(int16_t s,int16_t m) {}
-void S_Start(void) {}
-void S_StartSound(mobj_t *o,sfxenum_t s) {}
-void S_StartSound2(degenmobj_t *o,sfxenum_t s) {}
+void S_Start(void) { I_PebbleSoundStop(); }
+void S_StartSound(mobj_t *o,sfxenum_t s) { I_PebbleSound(s & ~PICKUP_SOUND,o!=NULL,o ? o->x : 0,o ? o->y : 0); }
+void S_StartSound2(degenmobj_t *o,sfxenum_t s) { I_PebbleSound(s,o!=NULL,o ? o->x : 0,o ? o->y : 0); }
 void S_StopSound(void *o) {}
 void S_StartMusic(musicenum_t m) {}
 void S_ChangeMusic(musicenum_t m,boolean loop) {}

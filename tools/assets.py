@@ -62,6 +62,15 @@ TEXTURES = {
 }
 SWITCH_PATCHES = {'SW1EXIT': 'PSWEX1', 'SW2EXIT': 'PSWEX2', 'SW1COMP': 'PSWCM1', 'SW2COMP': 'PSWCM2'}
 
+# Sound effects: Freedoom lump -> longest kept length in seconds. Converted to
+# 8 kHz signed 8-bit PCM (the speaker's stream format), trailing silence
+# trimmed, the end faded out. src/pebble/i_pebbles.c maps engine sounds onto
+# these (several engine sounds share one lump).
+SOUNDS = {
+    'DSPISTOL': 0.35, 'DSSHOTGN': 0.6, 'DSDOROPN': 0.6, 'DSSWTCHN': 0.4,
+    'DSITEMUP': 0.2, 'DSPLPAIN': 0.45, 'DSPODTH1': 0.6,
+}
+
 
 def texture_names():
     """All texture names in index order: design textures, then every switch

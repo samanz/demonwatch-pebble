@@ -12,7 +12,7 @@ import importlib
 import struct as st
 import sys
 
-from assets import PATCHES, ROOT, patch, read_lumps, sprite_frames, texture_names, texture_patch
+from assets import PATCHES, ROOT, SOUNDS, patch, read_lumps, sprite_frames, texture_names, texture_patch
 from convert_map import MapError, build as build_map
 from doommap import check
 
@@ -108,6 +108,13 @@ def build(maps=MAPS):
     for name in sprite_frames():
         lumps.append((name, art_or(name, placeholder_sprite)))
     lumps.append(('S_END', b''))
+    # Sound effects (8 kHz signed PCM) after the graphics markers; the app
+    # streams them with W_ReadLumpRange, so they never occupy the zone.
+    for name in SOUNDS:
+        if name in art:
+            lumps.append((name, art[name]))
+        else:
+            missing.append(name)
 
     out = bytearray(b'IWAD' + st.pack('<ii', len(lumps), 0))
     directory, dedup = [], {}

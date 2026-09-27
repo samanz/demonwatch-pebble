@@ -13,6 +13,7 @@
 #include "../doom/w_wad.h"
 #include "../doom/z_zone.h"
 #include "../doom/p_map.h"
+#include "../doom/tables.h"
 
 static Window *s_main_window;
 static Layer *s_canvas_layer;
@@ -23,7 +24,7 @@ static bool s_touching, s_up, s_down, s_select_held;
 // between two 35 Hz tics still fires one shot.
 #define TAP_FIRE_TICS 3
 static uint8_t s_fire_tics;
-enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL, ABOUT };
+enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL, ABOUT, MAP };
 #define PDOOM_VERSION "0.3.0"   // keep in step with package.json
 static uint8_t s_page=TITLE, s_parent=TITLE, s_choice, s_sensitivity=2, s_tilt_mode=1, s_skill=sk_medium;
 static bool s_invert, s_vibe_enabled=true;
@@ -40,7 +41,7 @@ static uint32_t s_message_until;
 static gamestate_t s_last_state=GS_DEMOSCREEN;  // logged on change, e.g. "state 1 map 1" = level cleared
 
 // Persistent storage keys (1-5 are settings).
-enum { KEY_SKILL=6, KEY_CHECKPOINT=10 };
+enum { KEY_SKILL=6, KEY_SOUND=7, KEY_CHECKPOINT=10 };
 
 // Checkpoint: the map, skill and inventory at the moment a level was entered
 // (new game or next level). Continue, death retry and "Restart level" load
@@ -78,7 +79,12 @@ static void clear_input(void) {
     s_fire_tics=0;
 }
 static void dirty(void) { if(s_canvas_layer) layer_mark_dirty(s_canvas_layer); }
+// Sound effects (i_pebbles.c).
+extern bool g_pebble_sound;
+void I_PebbleSoundPump(void);
+void I_PebbleSoundStop(void);
 static void page(uint8_t next) {
+    if(next!=GAME) I_PebbleSoundStop();
     s_page=next; s_choice=0; clear_input(); s_accumulator=0; dirty();
 }
 static void text(GContext *ctx,const char *str,int y,const char *font) {
@@ -144,7 +150,7 @@ static __attribute__((noinline)) bool guarded(void (*fn)(void)) {
 
 // ----- menus ------------------------------------------------------------------
 enum { A_CONTINUE, A_NEW, A_SETTINGS, A_CONTROLS, A_RESUME, A_RESTART, A_QUIT,
-       A_EASY, A_NORMAL, A_HARD, A_SENS, A_TURN, A_TILT, A_HAPTIC, A_BACK, A_ABOUT };
+       A_EASY, A_NORMAL, A_HARD, A_SENS, A_TURN, A_TILT, A_HAPTIC, A_BACK, A_ABOUT, A_MAP, A_SOUND };
 static __attribute__((noinline)) int menu(const char **labels,uint8_t *actions) {
     int n=0;
 #define ITEM(label,action) (labels[n]=(label),actions[n++]=(action))
@@ -156,19 +162,64 @@ static __attribute__((noinline)) int menu(const char **labels,uint8_t *actions) 
     } else if(s_page==SKILL) {
         ITEM("Easy",A_EASY); ITEM("Normal",A_NORMAL); ITEM("Hard",A_HARD);
     } else if(s_page==PAUSE) {
-        ITEM("Resume",A_RESUME); ITEM("Restart level",A_RESTART); ITEM("Settings",A_SETTINGS);
+        ITEM("Resume",A_RESUME); ITEM("Map",A_MAP); ITEM("Restart level",A_RESTART); ITEM("Settings",A_SETTINGS);
         ITEM("Controls",A_CONTROLS); ITEM("Quit",A_QUIT);
     } else if(s_page==SETTINGS) {
         ITEM(s_sensitivity==1 ? "Sens: gentle" : s_sensitivity==2 ? "Sens: normal" : "Sens: fast",A_SENS);
         ITEM(s_invert ? "Turn: inverted" : "Turn: normal",A_TURN);
         ITEM(s_tilt_mode==0 ? "Tilt: off" : s_tilt_mode==1 ? "Tilt: steer" : "Tilt: strafe",A_TILT);
+        ITEM(g_pebble_sound ? "Sound: on" : "Sound: off",A_SOUND);
         ITEM(s_vibe_enabled ? "Haptic: on" : "Haptic: off",A_HAPTIC);
         ITEM("Back",A_BACK);
     }
 #undef ITEM
     return n;
 }
+// ----- automap ----------------------------------------------------------------
+// North-up line map of the walls the player has seen, centred on the player.
+// Walls white, steps/ledges orange, doors/switches yellow, exit red; secret
+// doors are drawn as plain walls, as in Doom.
+static uint8_t s_map_zoom=1;   // 0..2: 4, 8 or 16 map units per pixel
+static void draw_automap(GContext *ctx) {
+    graphics_context_set_fill_color(ctx,GColorBlack);
+    graphics_fill_rect(ctx,GRect(0,0,200,228),0,GCornerNone);
+    if(_g_gamestate!=GS_LEVEL || !_g_player.mo) return;
+    const int shift=2+s_map_zoom, cx=100, cy=100;
+    const int px=_g_player.mo->x>>FRACBITS, py=_g_player.mo->y>>FRACBITS;
+    for(int16_t i=0;i<_g_numlines;++i) {
+        if(!(_g_lines[i].r_flags & ML_MAPPED)) continue;
+        const line_t *l=&_g_maplines[i];
+        const sector_t __far *back=(l->flags & ML_SECRET) ? NULL : LN_BACKSECTOR(l);
+        const sector_t __far *front=LN_FRONTSECTOR(l);
+        GColor c=GColorWhite;
+        int16_t special=_g_lines[i].special;
+        if(special==11 || special==51) c=GColorRed;
+        else if(special && !(l->flags & ML_SECRET)) c=GColorYellow;
+        else if(back) {
+            if(back->floorheight!=front->floorheight) c=GColorOrange;
+            else if(back->ceilingheight!=front->ceilingheight) c=GColorDarkGray;
+            else continue;   // flat opening: nothing to show
+        }
+        graphics_context_set_stroke_color(ctx,c);
+        graphics_draw_line(ctx,
+            GPoint(cx+((l->v1.x-px)>>shift),cy-((l->v1.y-py)>>shift)),
+            GPoint(cx+((l->v2.x-px)>>shift),cy-((l->v2.y-py)>>shift)));
+    }
+    // Player arrow: 8 px long along the view angle.
+    int32_t a=_g_player.mo->angle>>ANGLETOFINESHIFT;
+    int dx=(finecosine(a)*8)>>FRACBITS, dy=(finesine(a)*8)>>FRACBITS;
+    graphics_context_set_stroke_color(ctx,GColorGreen);
+    graphics_context_set_stroke_width(ctx,3);
+    graphics_draw_line(ctx,GPoint(cx-dx,cy+dy),GPoint(cx+dx,cy-dy));
+    graphics_context_set_stroke_width(ctx,1);
+    graphics_context_set_fill_color(ctx,GColorGreen);
+    graphics_fill_circle(ctx,GPoint(cx+dx,cy-dy),3);   // the facing end
+    graphics_context_set_text_color(ctx,GColorWhite);
+    text(ctx,"Up/Down: zoom   Back: return",207,FONT_KEY_GOTHIC_14);
+}
+
 static void draw_menu(GContext *ctx) {
+    if(s_page==MAP) { draw_automap(ctx); return; }
     graphics_context_set_fill_color(ctx,GColorBlack);
     graphics_fill_rect(ctx,GRect(0,0,200,228),0,GCornerNone);
     graphics_context_set_text_color(ctx,GColorWhite);
@@ -349,7 +400,7 @@ static void frame_timer_callback(void *data) {
     if(!s_paused) {
         if(elapsed>120) elapsed=120;
         s_accumulator+=elapsed*TICRATE;
-        if(!guarded(run_tics)) { enter_fatal(); s_accumulator=0; }
+        if(!guarded(run_tics) || !guarded(I_PebbleSoundPump)) { enter_fatal(); s_accumulator=0; }
     } else s_accumulator=0;
     if(s_canvas_layer) layer_mark_dirty(s_canvas_layer);
     s_frame_timer=app_timer_register(s_paused ? 200 : FRAME_INTERVAL_MS,frame_timer_callback,NULL);
@@ -405,9 +456,15 @@ static void move_choice(int step) {
     if(count) s_choice=(s_choice+count+step)%count;
     dirty();
 }
-static void up_press(ClickRecognizerRef r,void *c) { if(s_paused) move_choice(-1); else s_up=true; }
+static void up_press(ClickRecognizerRef r,void *c) {
+    if(s_page==MAP) { if(s_map_zoom) --s_map_zoom; dirty(); }
+    else if(s_paused) move_choice(-1); else s_up=true;
+}
 static void up_release(ClickRecognizerRef r,void *c) { s_up=false; }
-static void down_press(ClickRecognizerRef r,void *c) { if(s_paused) move_choice(1); else s_down=true; }
+static void down_press(ClickRecognizerRef r,void *c) {
+    if(s_page==MAP) { if(s_map_zoom<2) ++s_map_zoom; dirty(); }
+    else if(s_paused) move_choice(1); else s_down=true;
+}
 static void down_release(ClickRecognizerRef r,void *c) { s_down=false; }
 // On the death / level-end screens Select (or a tap) moves on; returns
 // whether it did.
@@ -419,7 +476,7 @@ static bool advance_screen(void) {
     return true;
 }
 static void select_press(ClickRecognizerRef r,void *c) {
-    if(s_page==HELP || s_page==ABOUT) { page(s_parent); return; }
+    if(s_page==HELP || s_page==ABOUT || s_page==MAP) { page(s_parent); return; }
     if(s_page==FATAL) return;
     if(s_page!=GAME) {
         const char *labels[6]; uint8_t actions[6];
@@ -437,6 +494,7 @@ static void select_press(ClickRecognizerRef r,void *c) {
         case A_SETTINGS: s_parent=previous; page(SETTINGS); break;
         case A_CONTROLS: s_parent=previous; page(HELP); break;
         case A_ABOUT: s_parent=previous; page(ABOUT); break;
+        case A_MAP: s_parent=previous; page(MAP); break;
         case A_RESUME: page(GAME); break;
         case A_RESTART: page(GAME); restart_level(); break;
         case A_QUIT: window_stack_pop(true); break;
@@ -444,6 +502,7 @@ static void select_press(ClickRecognizerRef r,void *c) {
         case A_TURN: s_invert=!s_invert; persist_write_bool(2,s_invert); break;
         case A_TILT: s_tilt_mode=(s_tilt_mode+1)%3; persist_write_int(3,s_tilt_mode); break;
         case A_HAPTIC: s_vibe_enabled=!s_vibe_enabled; persist_write_bool(4,s_vibe_enabled); break;
+        case A_SOUND: g_pebble_sound=!g_pebble_sound; persist_write_bool(KEY_SOUND,g_pebble_sound); break;
         case A_BACK: page(s_parent); break;
         }
         dirty(); return;
@@ -463,7 +522,7 @@ static void select_release(ClickRecognizerRef r,void *c) {
 static void back_click(ClickRecognizerRef r,void *c) {
     if(s_page==FATAL) { window_stack_pop(true); return; }
     if(s_page==SKILL) { page(TITLE); return; }
-    if(s_page==SETTINGS || s_page==HELP || s_page==ABOUT) { page(s_parent); return; }
+    if(s_page==SETTINGS || s_page==HELP || s_page==ABOUT || s_page==MAP) { page(s_parent); return; }
     if(s_page==TITLE) { window_stack_pop(true); return; }
     if(s_page==PAUSE) { page(GAME); return; }
     if(click_number_of_clicks_counted(r)>1) page(PAUSE);
@@ -502,6 +561,7 @@ static void main_window_load(Window *window) {
     s_frame_timer=app_timer_register(s_paused ? 200 : FRAME_INTERVAL_MS,frame_timer_callback,NULL);
 }
 static void main_window_unload(Window *window) {
+    I_PebbleSoundStop();
     if(s_frame_timer) { app_timer_cancel(s_frame_timer); s_frame_timer=NULL; }
     if(s_touch_subscribed) touch_service_unsubscribe();
     layer_destroy(s_canvas_layer); s_canvas_layer=NULL;
@@ -519,6 +579,7 @@ int main(void) {
         if(saved_tilt>=0 && saved_tilt<=2) s_tilt_mode=saved_tilt;
     }
     if(persist_exists(4)) s_vibe_enabled=persist_read_bool(4);
+    if(persist_exists(KEY_SOUND)) g_pebble_sound=persist_read_bool(KEY_SOUND);
     if(persist_exists(KEY_SKILL)) {
         int skill=persist_read_int(KEY_SKILL);
         if(skill>=sk_baby && skill<=sk_hard) s_skill=skill;
