@@ -9,6 +9,7 @@ from doommap import Map, NUKAGE, SKY, AMBUSH, SKILLS, UNPEG_BOTTOM
 # Doomednums used below.
 PLAYER, ZOMBIE, SHOTGUY, IMP = 1, 3004, 9, 3001
 SHOTGUN, SHELLS, CLIP, STIM, MEDI, ARMOR, BONUS = 2001, 2008, 2007, 2011, 2012, 2018, 2014
+BLUEARMOR, SHELLBOX = 2019, 2049
 LAMP, TECHCOL = 2028, 48
 
 GREY, DARK, BROWNF, STONEF, TEAL = 21, 20, 36, 42, 25
@@ -59,6 +60,13 @@ def build():
               (1264, 848), (1264, 720)], floor=64, ceil=136, floor_col=TEAL, ceil_col=GREY,
              light=192, wall='WALL')
     m.edge((1168, 864), (1232, 864), special=11, mid='SW1EXIT')
+
+    # Secret: a stone panel in the courtyard's north wall opens on a stash.
+    m.door(640, 896, 704, 912, axis='y', texture='STONE', track='STONE', floor=64, secret=True)
+    m.rect(608, 912, 736, 1008, floor=64, ceil=160, floor_col=STONEF, ceil_col=DARK, light=144,
+           special=9, wall='STONE')
+    m.thing(648, 960, BLUEARMOR)
+    m.thing(700, 960, SHELLBOX)
 
     # Things.
     m.thing(192, 64, PLAYER, angle=90)

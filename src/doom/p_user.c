@@ -331,6 +331,9 @@ static void P_PlayerInSpecialSector (player_t* player)
         // Tally player in secret sector, clear secret special
         player->secretcount++;
         sector->special = 0;
+#if defined PEBBLE_EMERY
+        player->message = "You found a secret!";
+#endif
         break;
 
       case 11:

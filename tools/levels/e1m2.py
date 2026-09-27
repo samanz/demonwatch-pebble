@@ -62,6 +62,13 @@ def build():
         m.edge((320, y), (448, y), lower='STEP')
     m.rect(192, 1184, 576, 1248, floor=48, ceil=160, floor_col=DARK, ceil_col=GREY, light=192, wall='COMP')
 
+    # Secret: a computer panel on the computer room's west wall opens.
+    m.door(176, 992, 192, 1056, axis='x', texture='COMP', track='COMP', secret=True)
+    m.rect(80, 976, 176, 1072, floor=0, ceil=128, floor_col=DARK, ceil_col=GREY, light=112,
+           special=9, wall='METAL')
+    m.thing(120, 1040, 2019)   # blue armour
+    m.thing(136, 1000, SHELLBOX)
+
     # Exit room.
     m.door(352, 1248, 416, 1264, axis='y', floor=48)
     m.sector([(288, 1264), (288, 1392), (352, 1392), (352, 1408), (416, 1408), (416, 1392),

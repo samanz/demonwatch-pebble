@@ -23,7 +23,8 @@ static bool s_touching, s_up, s_down, s_select_held;
 // between two 35 Hz tics still fires one shot.
 #define TAP_FIRE_TICS 3
 static uint8_t s_fire_tics;
-enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL };
+enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL, ABOUT };
+#define PDOOM_VERSION "0.3.0"   // keep in step with package.json
 static uint8_t s_page=TITLE, s_parent=TITLE, s_choice, s_sensitivity=2, s_tilt_mode=1, s_skill=sk_medium;
 static bool s_invert, s_vibe_enabled=true;
 #define s_paused (s_page != GAME)
@@ -143,7 +144,7 @@ static __attribute__((noinline)) bool guarded(void (*fn)(void)) {
 
 // ----- menus ------------------------------------------------------------------
 enum { A_CONTINUE, A_NEW, A_SETTINGS, A_CONTROLS, A_RESUME, A_RESTART, A_QUIT,
-       A_EASY, A_NORMAL, A_HARD, A_SENS, A_TURN, A_TILT, A_HAPTIC, A_BACK };
+       A_EASY, A_NORMAL, A_HARD, A_SENS, A_TURN, A_TILT, A_HAPTIC, A_BACK, A_ABOUT };
 static __attribute__((noinline)) int menu(const char **labels,uint8_t *actions) {
     int n=0;
 #define ITEM(label,action) (labels[n]=(label),actions[n++]=(action))
@@ -151,6 +152,7 @@ static __attribute__((noinline)) int menu(const char **labels,uint8_t *actions) 
         checkpoint_t c;
         if(read_checkpoint(&c)) ITEM("Continue",A_CONTINUE);
         ITEM("New game",A_NEW); ITEM("Settings",A_SETTINGS); ITEM("Controls",A_CONTROLS);
+        ITEM("About",A_ABOUT);
     } else if(s_page==SKILL) {
         ITEM("Easy",A_EASY); ITEM("Normal",A_NORMAL); ITEM("Hard",A_HARD);
     } else if(s_page==PAUSE) {
@@ -170,11 +172,22 @@ static void draw_menu(GContext *ctx) {
     graphics_context_set_fill_color(ctx,GColorBlack);
     graphics_fill_rect(ctx,GRect(0,0,200,228),0,GCornerNone);
     graphics_context_set_text_color(ctx,GColorWhite);
-    static const char *const titles[]={"pDOOM","","PAUSED","SETTINGS","CONTROLS","DIFFICULTY","ERROR"};
+    static const char *const titles[]={"pDOOM","","PAUSED","SETTINGS","CONTROLS","DIFFICULTY","ERROR","ABOUT"};
     text(ctx,titles[s_page],12,FONT_KEY_GOTHIC_28_BOLD);
     if(s_page==HELP) {
         const char *lines[]={"Up / Down: move","Select: fire","Tilt / drag: turn","Tap: open / fire","Hold screen: weapon","Back: use door","Double Back: pause"};
         for(int i=0;i<7;++i) text(ctx,lines[i],46+22*i,FONT_KEY_GOTHIC_18);
+    } else if(s_page==ABOUT) {
+        graphics_draw_text(ctx,
+            "Version " PDOOM_VERSION "\n"
+            "Doom64KB engine for Pebble.\n"
+            "Engine: GPL-2.0, id Software and\n"
+            "Doom64KB authors. Source is\n"
+            "available with this app.\n"
+            "Art: Freedoom (BSD licence).\n"
+            "Levels: CC0.",
+            fonts_get_system_font(FONT_KEY_GOTHIC_14),GRect(8,46,184,160),
+            GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
     } else if(s_page==FATAL) {
         graphics_draw_text(ctx,"pDOOM hit an error and stopped.",fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
             GRect(10,50,180,50),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
@@ -190,7 +203,7 @@ static void draw_menu(GContext *ctx) {
             text(ctx,items[i],y,FONT_KEY_GOTHIC_18_BOLD);
         }
     }
-    text(ctx,s_page==HELP ? "Back: return" : s_page==FATAL ? "Back: exit" : "Up/Down  Select",207,FONT_KEY_GOTHIC_14);
+    text(ctx,s_page==HELP || s_page==ABOUT ? "Back: return" : s_page==FATAL ? "Back: exit" : "Up/Down  Select",207,FONT_KEY_GOTHIC_14);
 }
 static void render_view(void) {
     if(_g_gamestate==GS_LEVEL && _g_player.mo) R_RenderPlayerView(&_g_player);
@@ -224,20 +237,21 @@ static void canvas_update_proc(Layer *layer,GContext *ctx) {
     }
     if(_g_gamestate!=GS_LEVEL || _g_player.playerstate==PST_DEAD) {
         graphics_context_set_fill_color(ctx,GColorBlack);
-        graphics_fill_rect(ctx,GRect(10,40,180,105),0,GCornerNone);
+        graphics_fill_rect(ctx,GRect(10,40,180,130),0,GCornerNone);
         const char *title,*hint;
-        static char stats[64];
+        static char stats[112];
         if(_g_gamestate==GS_LEVEL) { title="YOU DIED"; hint="Select: retry level\nDouble Back: menu"; }
         else {
             bool more=next_map_exists();
-            title=more ? "LEVEL CLEAR" : "YOU WIN";
-            snprintf(stats,sizeof(stats),"Kills %d/%d  Time %d:%02d\n%s",(int)_g_wminfo.plyr[0].skills,
-                (int)_g_wminfo.maxkills,(int)(_g_wminfo.plyr[0].stime/TICRATE/60),(int)(_g_wminfo.plyr[0].stime/TICRATE%60),
-                more ? "Select: next level" : "Select: play again");
+            title=more ? "LEVEL CLEAR" : "EPISODE CLEAR";
+            snprintf(stats,sizeof(stats),"Kills %d/%d  Secrets %d/%d\nTime %d:%02d\n%s",(int)_g_wminfo.plyr[0].skills,
+                (int)_g_wminfo.maxkills,(int)_g_wminfo.plyr[0].ssecret,(int)_g_wminfo.maxsecret,
+                (int)(_g_wminfo.plyr[0].stime/TICRATE/60),(int)(_g_wminfo.plyr[0].stime/TICRATE%60),
+                more ? "Select: next level" : "The base is quiet. For now.\nSelect: play again");
             hint=stats;
         }
         graphics_draw_text(ctx,title,fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),GRect(10,44,180,30),GTextOverflowModeTrailingEllipsis,GTextAlignmentCenter,NULL);
-        graphics_draw_text(ctx,hint,label,GRect(16,80,168,56),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
+        graphics_draw_text(ctx,hint,label,GRect(16,78,168,88),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
     }
     int32_t draw_ms=(int32_t)(now_ms()-draw_start);
     if(draw_ms>(int32_t)s_max_draw_ms) s_max_draw_ms=draw_ms;
@@ -297,6 +311,12 @@ static void run_tics(void) {
             // Entering a level fresh (new game, next map) saves a checkpoint;
             // finishing the last map clears it so the title offers no Continue.
             if(_g_gamestate==GS_LEVEL && !s_restored) save_checkpoint();
+            if(_g_gamestate==GS_LEVEL) {
+                static const char *const names[]={"E1M1: Hangar Gate","E1M2: Toxin Refinery","E1M3: Command Center"};
+                if(_g_gamemap>=1 && _g_gamemap<=(int)ARRAY_LENGTH(names)) {
+                    s_message=names[_g_gamemap-1]; s_message_until=now_ms()+2500;
+                }
+            }
             if(_g_gamestate==GS_INTERMISSION && !next_map_exists()) persist_delete(KEY_CHECKPOINT);
             s_restored=false;
         }
@@ -399,7 +419,7 @@ static bool advance_screen(void) {
     return true;
 }
 static void select_press(ClickRecognizerRef r,void *c) {
-    if(s_page==HELP) { page(s_parent); return; }
+    if(s_page==HELP || s_page==ABOUT) { page(s_parent); return; }
     if(s_page==FATAL) return;
     if(s_page!=GAME) {
         const char *labels[6]; uint8_t actions[6];
@@ -416,6 +436,7 @@ static void select_press(ClickRecognizerRef r,void *c) {
             start_game(false); break;
         case A_SETTINGS: s_parent=previous; page(SETTINGS); break;
         case A_CONTROLS: s_parent=previous; page(HELP); break;
+        case A_ABOUT: s_parent=previous; page(ABOUT); break;
         case A_RESUME: page(GAME); break;
         case A_RESTART: page(GAME); restart_level(); break;
         case A_QUIT: window_stack_pop(true); break;
@@ -442,7 +463,7 @@ static void select_release(ClickRecognizerRef r,void *c) {
 static void back_click(ClickRecognizerRef r,void *c) {
     if(s_page==FATAL) { window_stack_pop(true); return; }
     if(s_page==SKILL) { page(TITLE); return; }
-    if(s_page==SETTINGS || s_page==HELP) { page(s_parent); return; }
+    if(s_page==SETTINGS || s_page==HELP || s_page==ABOUT) { page(s_parent); return; }
     if(s_page==TITLE) { window_stack_pop(true); return; }
     if(s_page==PAUSE) { page(GAME); return; }
     if(click_number_of_clicks_counted(r)>1) page(PAUSE);

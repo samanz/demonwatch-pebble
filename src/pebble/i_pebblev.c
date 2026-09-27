@@ -33,31 +33,46 @@ uint8_t *I_GetPebbleFramebuffer(void) {
     return s_fb;
 }
 
-// Scale each logical pixel directly into the captured OS framebuffer.
-static void draw_cell(int x, int y, uint8_t color, int fuzz) {
-    int x0=x*PEBBLE_SCREEN_WIDTH/VIEWWINDOWWIDTH;
-    int x1=(x+1)*PEBBLE_SCREEN_WIDTH/VIEWWINDOWWIDTH;
-    int y0=y*PEBBLE_VIEW_HEIGHT/VIEWWINDOWHEIGHT;
-    int y1=(y+1)*PEBBLE_VIEW_HEIGHT/VIEWWINDOWHEIGHT;
-    for (int py=y0; py<y1; ++py) {
-        uint8_t *dst=s_fb+py*s_fb_width+x0;
-        for(int px=x0; px<x1; ++px,++dst)
-            *dst=fuzz ? 0xc0 | ((*dst >> 1)&0x15) : color;
-    }
+// Logical pixel (x, y) covers screen columns s_xb[x] .. s_xb[x+1]-1 and rows
+// s_yb[y] .. s_yb[y+1]-1: 120 x 114 scaled to 200 x 190, so every cell is
+// 1-2 pixels each way. The tables replace four divisions per pixel.
+static uint8_t s_xb[VIEWWINDOWWIDTH + 1], s_yb[VIEWWINDOWHEIGHT + 1];
+
+static void init_scale_tables(void) {
+    for (int x = 0; x <= VIEWWINDOWWIDTH; x++) s_xb[x] = x * PEBBLE_SCREEN_WIDTH / VIEWWINDOWWIDTH;
+    for (int y = 0; y <= VIEWWINDOWHEIGHT; y++) s_yb[y] = y * PEBBLE_VIEW_HEIGHT / VIEWWINDOWHEIGHT;
 }
+
 static void draw_column(const draw_column_vars_t *dc, int flat, uint8_t color, int fuzz) {
     if (!s_fb || dc->x < 0 || dc->x >= VIEWWINDOWWIDTH) return;
+    if (!s_xb[VIEWWINDOWWIDTH]) init_scale_tables();
     int lo=dc->yl<0 ? 0 : dc->yl;
     int hi=dc->yh>=VIEWWINDOWHEIGHT ? VIEWWINDOWHEIGHT-1 : dc->yh;
+    if (lo > hi) return;
     uint16_t frac=(dc->texturemid >> COLEXTRABITS)+(lo-CENTERY)*dc->fracstep;
     // Flat colours arrive already lit (R_GetPlaneColor); textures and sprites
     // go through the sector's 64-entry light table.
     const uint8_t *light=flat ? NULL : dc->colormap;
+    const int stride=s_fb_width;
+    const int wide=s_xb[dc->x+1]-s_xb[dc->x] > 1;
+    uint8_t *dst=s_fb+s_yb[lo]*stride+s_xb[dc->x];
+    uint8_t pixel=0xc0 | (color & 63);
     for(int y=lo;y<=hi;++y) {
-        uint8_t index=flat ? color : dc->source[frac >> COLBITS];
-        if(light) index=light[index & 63];
-        draw_cell(dc->x,y,0xc0 | (index & 63),fuzz);
-        frac+=dc->fracstep;
+        if(!flat) {
+            uint8_t index=dc->source[frac >> COLBITS];
+            if(light) index=light[index & 63];
+            pixel=0xc0 | (index & 63);
+            frac+=dc->fracstep;
+        }
+        for(int rows=s_yb[y+1]-s_yb[y]; rows>0; --rows, dst+=stride) {
+            if(fuzz) {
+                dst[0]=0xc0 | ((dst[0] >> 1)&0x15);
+                if(wide) dst[1]=0xc0 | ((dst[1] >> 1)&0x15);
+            } else {
+                dst[0]=pixel;
+                if(wide) dst[1]=pixel;
+            }
+        }
     }
 }
 void R_DrawColumnWall(const draw_column_vars_t *dc) { draw_column(dc,0,0,0); }

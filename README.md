@@ -1,4 +1,4 @@
-# pDOOM 0.2 — release preparation
+# pDOOM 0.3
 
 Native Doom64KB-derived game for Pebble Time 2 (Emery), built with Pebble SDK 4.33.1. It contains a three-map episode of original Doom-style levels (E1M1 Hangar Gate, E1M2 Toxin Refinery, E1M3 Command Center) with doors, key doors, a lift, stairs, nukage, windows and outdoor areas; zombiemen, shotgun guys, imps and demons; and the fist, pistol, shotgun and chaingun. Art is adapted from Freedoom 0.13.0. No commercial Doom WAD is required or bundled.
 
@@ -12,7 +12,7 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - Hold Select and click Back: cycle owned weapons.
 - Tilt the watch left / right: turn (default) or strafe, chosen in Settings.
 - Double Back: open the pause menu. Up/Down choose Resume, Restart level, Settings, Controls, or Quit; Select confirms. Back resumes.
-- Launch opens a title menu: Continue (when a checkpoint exists), New game, Settings, Controls. New game asks for a difficulty: Easy (Doom's "too young to die": half damage, double ammo), Normal, or Hard; the choice is remembered.
+- Launch opens a title menu: Continue (when a checkpoint exists), New game, Settings, Controls, About (version, licences and credits). New game asks for a difficulty: Easy (Doom's "too young to die": half damage, double ammo), Normal, or Hard; the choice is remembered.
 - Checkpoints: entering a level (new game or next map) saves the map, difficulty and inventory. Continue resumes there after quitting; dying and the pause menu's "Restart level" reload the level with that inventory (health at least 50). Keys are per level, as in Doom. Finishing the episode clears the checkpoint.
 - If the engine hits a fatal error, an error page replaces the game (Back exits) instead of the app freezing.
 - Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), and haptics (a buzz when you take damage). There is no music.
@@ -22,7 +22,7 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - After death: Select retries the current level.
 - After the exit switch: Select continues to the next map (E1M2, E1M3, … when present, keeping inventory). After the last map, Select starts a new game.
 
-Doors open with Back and close again after a few seconds. Key doors (blue, yellow stripes beside the door) need the matching keycard. A lift is used by pressing Back at its side. Each map ends at an exit switch.
+Each level announces its name on entry and has one secret (a door disguised as wall, with a stash behind it); the level-end screen shows kills, secrets found and time, and the last map ends with an episode-clear screen. Doors open with Back and close again after a few seconds. Key doors (blue, yellow stripes beside the door) need the matching keycard. A lift is used by pressing Back at its side. Each map ends at an exit switch.
 
 ## Verified scope and limits
 

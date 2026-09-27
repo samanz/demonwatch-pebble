@@ -44,6 +44,13 @@ def build():
              floor_col=RUST, ceil_col=GREY, light=96, special=8, wall='GRAY', holes=[dais])
     m.sector(dais, floor=24, ceil=144, floor_col=TEAL, ceil_col=GREY, light=192, wall='STEP')
 
+    # Secret: a stone panel in the arena's west wall hides supplies.
+    m.door(-272, 480, -256, 544, axis='x', texture='STONE', track='STONE', floor=16, secret=True)
+    m.rect(-400, 464, -272, 560, floor=16, ceil=128, floor_col=STONEF, ceil_col=GREY, light=112,
+           special=9, wall='GRAY')
+    m.thing(-336, 530, MEDI)
+    m.thing(-340, 490, AMMOBOX)
+
     # Yellow door east into the control room.
     m.door(576, 672, 592, 736, axis='x', special=27, track='DOORYEL', floor=16)
     pillars = [[(720, 624), (720, 656), (752, 656), (752, 624)],

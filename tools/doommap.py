@@ -90,16 +90,18 @@ class Map:
         self.things.append((x, y, angle, kind, flags))
 
     def door(self, x1, y1, x2, y2, axis, special=1, tag=0, texture='DOOR',
-             track='DOORTRAK', floor=0, **kw):
+             track='DOORTRAK', floor=0, secret=False, **kw):
         """A door sector spanning a doorway. axis='x' means the player walks
-        along x through it (faces are the x1 and x2 edges)."""
+        along x through it (faces are the x1 and x2 edges). A secret door
+        uses the surrounding wall texture for texture/track and gets Doom's
+        secret line flag."""
         d = self.rect(x1, y1, x2, y2, floor=floor, ceil=floor, tag=tag, wall=track, **kw)
         faces = [((x1, y1), (x1, y2)), ((x2, y1), (x2, y2))] if axis == 'x' else \
                 [((x1, y1), (x2, y1)), ((x1, y2), (x2, y2))]
         tracks = [((x1, y1), (x2, y1)), ((x1, y2), (x2, y2))] if axis == 'x' else \
                  [((x1, y1), (x1, y2)), ((x2, y1), (x2, y2))]
         for a, b in faces:
-            self.edge(a, b, special=special, upper=texture)
+            self.edge(a, b, special=special, upper=texture, flags=SECRET if secret else 0)
             self.door_faces[frozenset((a, b))] = d
         for a, b in tracks:
             self.edge(a, b, flags=UNPEG_BOTTOM)
