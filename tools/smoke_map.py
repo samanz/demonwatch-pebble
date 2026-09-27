@@ -30,13 +30,22 @@ def snap(name):
     run('screenshot', '--emulator', 'emery', '--no-open', f'work/{prefix}-{name}.png')
 
 
-run('install', '--emulator', 'emery', pbw)
 run('emu-accel', '--emulator', 'emery', 'gravity-z')
-time.sleep(2)
 with LOG.open('w') as f:
     log = subprocess.Popen(cmd + ['logs', '--emulator', 'emery'], stdout=f, stderr=f)
     try:
-        btn('click', 'select')          # New game
+        time.sleep(2)
+        run('install', '--emulator', 'emery', pbw)
+        for _ in range(30):             # the title logs whether Continue is offered
+            m = re.search(r'title: continue (\d)', LOG.read_text(errors='replace'))
+            if m:
+                break
+            time.sleep(0.5)
+        time.sleep(0.5)
+        if m and m.group(1) == '1':
+            btn('click', 'down')        # skip Continue
+        btn('click', 'select')          # New game -> difficulty
+        btn('click', 'select')          # last used difficulty
         time.sleep(1.5)
         snap('start')
         btn('--duration', '2500', 'click', 'up')

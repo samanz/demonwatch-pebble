@@ -103,6 +103,7 @@ static int32_t             totalleveltimes;      // CPhipps - total time for all
 static boolean gamekeydown[NUMKEYS];
 
 static skill_t d_skill;
+static int16_t d_map = 1;
 
 static byte  savegameslot;         // Slot to load if gameaction == ga_loadgame
 
@@ -571,8 +572,8 @@ void G_PlayerReborn (void)
     memset (p, 0, sizeof(*p));
     p->cheats = cheats;
 #if defined PDOOM_PLAYTEST
-    // Emulator playtest build only (tools/check_playthrough.py): the bot
-    // cannot aim, so it must not be able to die.
+    // Emulator playtest build only (tools/check_maps.py): the test cannot
+    // aim, so the player must not be able to die.
     p->cheats |= CF_GODMODE;
 #endif
 
@@ -590,6 +591,12 @@ void G_PlayerReborn (void)
 
     for (i=0 ; i<NUMAMMO ; i++)
         p->maxammo[i] = maxammo[i];
+
+#if defined PEBBLE_EMERY
+    // Continue / retry: the Pebble layer may put back the inventory saved
+    // when this level was entered (before the player mobj is spawned).
+    I_PebbleRestoreCheckpoint(p);
+#endif
 }
 
 //
@@ -893,7 +900,15 @@ void G_LoadSettings()
 void G_DeferedInitNew(skill_t skill)
 {
     d_skill = skill;
+    d_map = 1;
     _g_gameaction = ga_newgame;
+}
+
+// Start a new game on a given map (Pebble "Continue").
+void G_DeferedInitNewMap(skill_t skill, int16_t map)
+{
+    G_DeferedInitNew(skill);
+    d_map = map;
 }
 
 // killough 3/1/98: function to reload all the default parameter
@@ -912,7 +927,7 @@ void G_ReloadDefaults(void)
 static void G_DoNewGame (void)
 {
     G_ReloadDefaults();            // killough 3/1/98
-    G_InitNew (d_skill, 1);
+    G_InitNew (d_skill, d_map);
     _g_gameaction = ga_nothing;
 
     //jff 4/26/98 wake up the status bar in case were coming out of a DM demo

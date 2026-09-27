@@ -32,3 +32,11 @@ void I_PebbleTick(void);
 
 // HUD drawer
 void ST_PebbleDrawer(uint8_t *fb);
+
+// Checkpoints: called by G_PlayerReborn; restores the inventory saved when
+// the current level was entered, if a continue/retry asked for it.
+struct player_s;
+void I_PebbleRestoreCheckpoint(struct player_s *player);
+
+// Fatal errors (I_Error): shows an error screen instead of hanging.
+_Noreturn void I_PebbleFatal(const char *message);

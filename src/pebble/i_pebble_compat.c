@@ -21,8 +21,9 @@ static uint32_t s_zone_size = 0;
 
 uint8_t __far* I_ZoneBase(uint32_t *heapSize) {
     if (!s_zone) {
-        // Largest first; the level data of bigger maps lives here.
-        static const uint16_t sizes_kb[] = {30, 26, 22, 18};
+        // Largest first; the level data of bigger maps lives here. 28 KB
+        // leaves ~7 KB of heap for PebbleOS (text, timers, persist).
+        static const uint16_t sizes_kb[] = {28, 24, 20, 18};
         uint8_t *raw = NULL;
         for (unsigned i = 0; !raw && i < sizeof(sizes_kb) / sizeof(sizes_kb[0]); ++i) {
             *heapSize = sizes_kb[i] * 1024u;
@@ -44,10 +45,12 @@ void I_InitTimer(void) { s_gametic = 0; }
 int32_t I_GetTime(void) { return ++s_gametic; }
 
 _Noreturn void I_Quit(void) { for(;;); }
-// Logs the format string only: Pebble's libc has no vsnprintf.
+// Logs the format string only: Pebble's libc has no vsnprintf. The Pebble
+// layer then abandons the engine and shows an error screen.
+_Noreturn void I_PebbleFatal(const char *message);
 _Noreturn void I_Error(const char *error, ...) {
     app_log(1, "doom", 0, "FATAL: %s", error);
-    for(;;);
+    I_PebbleFatal(error);
 }
 void exit(int code) { (void)code; for(;;); }
 

@@ -19,11 +19,12 @@ from doommap import check
 OUTPUT = ROOT / 'resources/pdoom.pbl'
 MAPS = ['e1m1', 'e1m2', 'e1m3']
 RESOURCE_LIMIT = 262144 - 4096   # Emery resource budget, minus headroom
-# Per-level zone budget for convert_map's estimate. Measured in the emulator
-# with the 30 KB zone: 26.6 KB is free when a new game starts, and E1M1
-# (estimate 10.7 KB) really uses 12.7 KB, so real use is ~1.2x the estimate.
-# Keep ~2.5 KB spare for projectiles, puffs and blood: 24 KB / 1.2.
-ZONE_BUDGET = 20000
+# Per-level zone budget for convert_map's estimate. Measured in the emulator:
+# with the 28 KB zone ~22.8 KB is free when a new game starts (4 KB of static
+# data, 2 KB of light tables), and E1M1 (estimate 10.7 KB) really uses
+# 12.7 KB, so real use is ~1.2x the estimate. Keep ~2.5 KB spare for
+# projectiles, puffs and blood: (22.8 - 2.5) KB / 1.2.
+ZONE_BUDGET = 17000
 
 
 def colormap():

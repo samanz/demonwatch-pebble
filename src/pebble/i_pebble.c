@@ -18,8 +18,8 @@ static Layer *s_canvas_layer;
 static AppTimer *s_frame_timer;
 pebble_input_state_t g_pebble_input;
 static bool s_touching, s_up, s_down;
-enum { TITLE, GAME, PAUSE, SETTINGS, HELP };
-static uint8_t s_page=TITLE, s_parent=TITLE, s_choice, s_sensitivity=2, s_tilt_mode=1;
+enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL };
+static uint8_t s_page=TITLE, s_parent=TITLE, s_choice, s_sensitivity=2, s_tilt_mode=1, s_skill=sk_medium;
 static bool s_invert, s_vibe_enabled=true, s_speaker_enabled=true;
 #define s_paused (s_page != GAME)
 static bool s_touch_subscribed;
@@ -32,11 +32,39 @@ static unsigned s_hits, s_clock_skips;
 static const char *s_message;
 static uint32_t s_message_until;
 static gamestate_t s_last_state=GS_DEMOSCREEN;  // logged on change, e.g. "state 1 map 1" = level cleared
+
+// Persistent storage keys (1-5 are settings).
+enum { KEY_SKILL=6, KEY_CHECKPOINT=10 };
+
+// Checkpoint: the map, skill and inventory at the moment a level was entered
+// (new game or next level). Continue, death retry and "Restart level" load
+// the level again with this inventory; keys are per level, as in Doom.
+#define CHECKPOINT_VERSION 1
+typedef struct {
+    uint8_t version, map, skill, backpack;
+    int16_t health, armorpoints, armortype, readyweapon;
+    int16_t weaponowned[NUMWEAPONS], ammo[NUMAMMO], maxammo[NUMAMMO];
+} checkpoint_t;
+static bool s_restore_pending;  // restore on the next player reborn
+static bool s_restored;         // this level load came from a checkpoint
+
+// Fatal engine errors longjmp back to the Pebble entry point that called
+// into the engine; the engine is then abandoned and an error page shown.
+// GCC's builtin setjmp/longjmp: newlib's versions pull in unwinder and
+// abort() code the Pebble SDK cannot link. The builtin longjmp must be called
+// from a different function than the setjmp, and its value is always 1.
+#define setjmp(buf) __builtin_setjmp(buf)
+#define longjmp(buf, v) __builtin_longjmp(buf, 1)
+static void *s_fatal_jmp[5];
+static bool s_fatal_armed;
+static const char *s_fatal_message;
 static uint32_t now_ms(void) {
     time_t sec; uint16_t ms; time_ms(&sec,&ms);
     return (uint32_t)sec*1000u+ms;
 }
-#define FRAME_INTERVAL_MS 16
+// 30 frames per second: the display needs no more, and the 35 Hz simulation
+// is timed separately. Halves drawing work (and battery) versus 60 fps.
+#define FRAME_INTERVAL_MS 33
 
 /* Authentic Metallica / E1M1 "At Doom's Gate" Speaker Riff */
 static const SpeakerNote s_e1m1_guitar_notes[] = {
@@ -212,34 +240,112 @@ static bool next_map_exists(void) {
     name[3]='1'+_g_wminfo.next;
     return W_GetNumForName(name)>=0;
 }
+// ----- checkpoints ---------------------------------------------------------
+static __attribute__((noinline)) bool read_checkpoint(checkpoint_t *c) {
+    return persist_exists(KEY_CHECKPOINT) &&
+        persist_read_data(KEY_CHECKPOINT,c,sizeof(*c))==(int)sizeof(*c) &&
+        c->version==CHECKPOINT_VERSION && c->map>=1 && c->map<=9 && c->skill<=sk_nightmare;
+}
+static __attribute__((noinline)) void save_checkpoint(void) {
+    checkpoint_t c={CHECKPOINT_VERSION,(uint8_t)_g_gamemap,(uint8_t)_g_gameskill,(uint8_t)_g_player.backpack,
+        _g_player.health,_g_player.armorpoints,_g_player.armortype,_g_player.readyweapon};
+    memcpy(c.weaponowned,_g_player.weaponowned,sizeof(c.weaponowned));
+    memcpy(c.ammo,_g_player.ammo,sizeof(c.ammo));
+    memcpy(c.maxammo,_g_player.maxammo,sizeof(c.maxammo));
+    persist_write_data(KEY_CHECKPOINT,&c,sizeof(c));
+    APP_LOG(APP_LOG_LEVEL_INFO,"checkpoint saved: map %d skill %d hp%d",c.map,c.skill,c.health);
+}
+void I_PebbleRestoreCheckpoint(struct player_s *p) {
+    checkpoint_t c;
+    if(!s_restore_pending) return;
+    s_restore_pending=false;
+    if(!read_checkpoint(&c)) return;
+    // A checkpoint taken on the brink of death would be unwinnable.
+    p->health=c.health<50 ? 50 : c.health;
+    p->armorpoints=c.armorpoints; p->armortype=c.armortype; p->backpack=c.backpack;
+    memcpy(p->weaponowned,c.weaponowned,sizeof(c.weaponowned));
+    memcpy(p->ammo,c.ammo,sizeof(c.ammo));
+    memcpy(p->maxammo,c.maxammo,sizeof(c.maxammo));
+    p->readyweapon=p->pendingweapon=(weapontype_t)c.readyweapon;
+    s_restored=true;
+    APP_LOG(APP_LOG_LEVEL_INFO,"checkpoint restored: map %d hp%d",c.map,p->health);
+}
+
+// ----- fatal errors -----------------------------------------------------------
+static __attribute__((noinline)) void enter_fatal(void) {
+    s_fatal_armed=false;
+    stop_doom_speaker_music();
+    s_page=FATAL; s_choice=0; clear_input(); dirty();
+}
+_Noreturn void I_PebbleFatal(const char *message) {
+    s_fatal_message=message;
+    if(s_fatal_armed) { s_fatal_armed=false; longjmp(s_fatal_jmp,1); }
+    for(;;);   // no engine entry point to return to (startup window code)
+}
+// Run engine work; false if it hit a fatal error. Keeping the setjmp in this
+// one small function spares the big callers from its register spills.
+static __attribute__((noinline)) bool guarded(void (*fn)(void)) {
+    if(setjmp(s_fatal_jmp)) return false;
+    s_fatal_armed=true;
+    fn();
+    s_fatal_armed=false;
+    return true;
+}
+
+// ----- menus ------------------------------------------------------------------
+enum { A_CONTINUE, A_NEW, A_SETTINGS, A_CONTROLS, A_RESUME, A_RESTART, A_QUIT,
+       A_EASY, A_NORMAL, A_HARD, A_SENS, A_TURN, A_TILT, A_SPEAKER, A_HAPTIC, A_BACK };
+static __attribute__((noinline)) int menu(const char **labels,uint8_t *actions) {
+    int n=0;
+#define ITEM(label,action) (labels[n]=(label),actions[n++]=(action))
+    if(s_page==TITLE) {
+        checkpoint_t c;
+        if(read_checkpoint(&c)) ITEM("Continue",A_CONTINUE);
+        ITEM("New game",A_NEW); ITEM("Settings",A_SETTINGS); ITEM("Controls",A_CONTROLS);
+    } else if(s_page==SKILL) {
+        ITEM("Easy",A_EASY); ITEM("Normal",A_NORMAL); ITEM("Hard",A_HARD);
+    } else if(s_page==PAUSE) {
+        ITEM("Resume",A_RESUME); ITEM("Restart level",A_RESTART); ITEM("Settings",A_SETTINGS);
+        ITEM("Controls",A_CONTROLS); ITEM("Quit",A_QUIT);
+    } else if(s_page==SETTINGS) {
+        ITEM(s_sensitivity==1 ? "Sens: gentle" : s_sensitivity==2 ? "Sens: normal" : "Sens: fast",A_SENS);
+        ITEM(s_invert ? "Turn: inverted" : "Turn: normal",A_TURN);
+        ITEM(s_tilt_mode==0 ? "Tilt: off" : s_tilt_mode==1 ? "Tilt: steer" : "Tilt: strafe",A_TILT);
+        ITEM(s_speaker_enabled ? "Speaker: on" : "Speaker: off",A_SPEAKER);
+        ITEM(s_vibe_enabled ? "Haptic: on" : "Haptic: off",A_HAPTIC);
+        ITEM("Back",A_BACK);
+    }
+#undef ITEM
+    return n;
+}
 static void draw_menu(GContext *ctx) {
     graphics_context_set_fill_color(ctx,GColorBlack);
     graphics_fill_rect(ctx,GRect(0,0,200,228),0,GCornerNone);
     graphics_context_set_text_color(ctx,GColorWhite);
-    text(ctx,s_page==TITLE ? "pDOOM" : s_page==PAUSE ? "PAUSED" : s_page==SETTINGS ? "SETTINGS" : "CONTROLS",12,FONT_KEY_GOTHIC_28_BOLD);
+    static const char *const titles[]={"pDOOM","","PAUSED","SETTINGS","CONTROLS","DIFFICULTY","ERROR"};
+    text(ctx,titles[s_page],12,FONT_KEY_GOTHIC_28_BOLD);
     if(s_page==HELP) {
         const char *lines[]={"Up / Down: move","Hold Select: fire","Tilt: steer / strafe","Drag: look / turn","Double tap: weapon","Back: use door","Double Back: pause"};
         for(int i=0;i<7;++i) text(ctx,lines[i],46+22*i,FONT_KEY_GOTHIC_18);
+    } else if(s_page==FATAL) {
+        graphics_draw_text(ctx,"pDOOM hit an error and stopped.",fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+            GRect(10,50,180,50),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
+        graphics_draw_text(ctx,s_fatal_message ? s_fatal_message : "",fonts_get_system_font(FONT_KEY_GOTHIC_14),
+            GRect(10,104,180,90),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
     } else {
-        const char *items[6]; int count;
-        if(s_page==TITLE) { items[0]="New game"; items[1]="Settings"; items[2]="Controls"; count=3; }
-        else if(s_page==PAUSE) { items[0]="Resume";items[1]="Restart";items[2]="Settings";items[3]="Controls";items[4]="Quit";count=5; }
-        else {
-            items[0]=s_sensitivity==1 ? "Sens: gentle" : s_sensitivity==2 ? "Sens: normal" : "Sens: fast";
-            items[1]=s_invert ? "Turn: inverted" : "Turn: normal";
-            items[2]=s_tilt_mode==0 ? "Tilt: off" : s_tilt_mode==1 ? "Tilt: steer" : "Tilt: strafe";
-            items[3]=s_speaker_enabled ? "Speaker: on" : "Speaker: off";
-            items[4]=s_vibe_enabled ? "Haptic: on" : "Haptic: off";
-            items[5]="Back"; count=6;
-        }
+        const char *items[6]; uint8_t actions[6];
+        int count=menu(items,actions);
         for(int i=0;i<count;++i) {
-            int y=(count==6 ? 38+24*i : count==5 ? 44+24*i : 60+27*i);
+            int y=(count==6 ? 38+24*i : count==5 ? 44+24*i : count==4 ? 50+27*i : 60+27*i);
             graphics_context_set_fill_color(ctx,GColorDarkGray);
             if(i==s_choice) graphics_fill_rect(ctx,GRect(12,y+2,176,23),3,GCornersAll);
             text(ctx,items[i],y,FONT_KEY_GOTHIC_18_BOLD);
         }
     }
-    text(ctx,s_page==HELP ? "Back: return" : "Up/Down  Select",207,FONT_KEY_GOTHIC_14);
+    text(ctx,s_page==HELP ? "Back: return" : s_page==FATAL ? "Back: exit" : "Up/Down  Select",207,FONT_KEY_GOTHIC_14);
+}
+static void render_view(void) {
+    if(_g_gamestate==GS_LEVEL && _g_player.mo) R_RenderPlayerView(&_g_player);
 }
 static void canvas_update_proc(Layer *layer,GContext *ctx) {
     if(s_page!=GAME) { draw_menu(ctx); return; }
@@ -249,10 +355,11 @@ static void canvas_update_proc(Layer *layer,GContext *ctx) {
     ++s_frames;
     uint8_t *pixels=gbitmap_get_data(fb);
     I_SetPebbleFramebuffer(pixels,gbitmap_get_bytes_per_row(fb),PEBBLE_SCREEN_HEIGHT);
-    if(_g_gamestate==GS_LEVEL && _g_player.mo) R_RenderPlayerView(&_g_player);
-    ST_PebbleDrawer(pixels);
+    bool ok=guarded(render_view);
+    if(ok) ST_PebbleDrawer(pixels);
     I_SetPebbleFramebuffer(NULL,PEBBLE_SCREEN_WIDTH,PEBBLE_SCREEN_HEIGHT);
     graphics_release_frame_buffer(ctx,fb);
+    if(!ok) { enter_fatal(); draw_menu(ctx); return; }
     graphics_context_set_text_color(ctx,GColorWhite);
     GFont label=fonts_get_system_font(FONT_KEY_GOTHIC_14);
     graphics_draw_text(ctx,"HP",label,GRect(18,190,40,16),GTextOverflowModeTrailingEllipsis,GTextAlignmentLeft,NULL);
@@ -287,6 +394,79 @@ static void canvas_update_proc(Layer *layer,GContext *ctx) {
     int32_t draw_ms=(int32_t)(now_ms()-draw_start);
     if(draw_ms>(int32_t)s_max_draw_ms) s_max_draw_ms=draw_ms;
 }
+// Run the 35 Hz simulation tics owed by s_accumulator.
+static void run_tics(void) {
+    while(s_accumulator>=1000) {
+        s_accumulator-=1000;
+        g_pebble_input.forward_move=g_pebble_input.button_attack ? 0 : (s_up-s_down)*25;
+        g_pebble_input.side_move=0;
+        if(g_pebble_input.button_attack && (s_up || s_down)) {
+            g_pebble_input.angle_turn+=(s_up-s_down)*900;
+        }
+        if(s_tilt_mode) {
+            AccelData accel;
+            if(accel_service_peek(&accel)==0 && !accel.did_vibrate) {
+                int16_t ax=accel.x;
+                int16_t deadzone=100;
+                if(abs(ax)>deadzone) {
+                    int16_t diff=abs(ax)-deadzone;
+                    if(diff>600) diff=600;
+                    int dir=(ax>0 ? -1 : 1)*(s_invert ? -1 : 1);
+                    if(s_tilt_mode==1) {
+                        int32_t turn=g_pebble_input.angle_turn + dir * diff * s_sensitivity;
+                        if(turn>30000) turn=30000;
+                        if(turn<-30000) turn=-30000;
+                        g_pebble_input.angle_turn=turn;
+                    } else if(s_tilt_mode==2) {
+                        g_pebble_input.side_move=(dir>0 ? -25 : 25);
+                    }
+                }
+            }
+        }
+        uint32_t tick_start=now_ms();
+        int old_health=_g_player.health;
+#if defined PDOOM_PLAYTEST
+        // Playtest build only: holding Down for 2 s exits the level, so the
+        // emulator check (which can press one button at a time) can visit
+        // every map.
+        static int s_down_tics;
+        s_down_tics=s_down ? s_down_tics+1 : 0;
+        if(s_down_tics==2*TICRATE && _g_gamestate==GS_LEVEL) {
+            APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST warp");
+            G_ExitLevel();
+        }
+#endif
+        G_BuildTiccmd(); G_Ticker(); ++_g_gametic;
+        if(_g_player.message) {
+            s_message=_g_player.message; s_message_until=now_ms()+2000;
+            _g_player.message=NULL;
+        }
+        if(_g_gamestate!=s_last_state) {
+            s_last_state=_g_gamestate;
+            APP_LOG(APP_LOG_LEVEL_INFO,"state %d map %d zone%lu",_g_gamestate,_g_gamemap,
+                (unsigned long)Z_GetTotalFreeMemory());
+            // Entering a level fresh (new game, next map) saves a checkpoint;
+            // finishing the last map clears it so the title offers no Continue.
+            if(_g_gamestate==GS_LEVEL && !s_restored) save_checkpoint();
+            if(_g_gamestate==GS_INTERMISSION && !next_map_exists()) persist_delete(KEY_CHECKPOINT);
+            s_restored=false;
+        }
+        if(_g_player.health<old_health) {
+            ++s_hits;
+            if(s_vibe_enabled) vibes_double_pulse();
+        }
+        int32_t tick_ms=(int32_t)(now_ms()-tick_start);
+        if(tick_ms>(int32_t)s_max_tick_ms) s_max_tick_ms=tick_ms;
+        if(_g_gametic%105==0 && _g_player.mo) {
+            APP_LOG(APP_LOG_LEVEL_INFO,"tick %ld pos %ld,%ld hp%d ammo%d kills%d frames%u heap%lu zone%lu",_g_gametic,
+                _g_player.mo->x>>16,_g_player.mo->y>>16,_g_player.health,
+                _g_player.ammo[0],_g_player.killcount,s_frames,(unsigned long)heap_bytes_free(),
+                (unsigned long)Z_GetTotalFreeMemory());
+            APP_LOG(APP_LOG_LEVEL_INFO,"timing draw%lu tick%lu gap%lu hits%u skips%u",(unsigned long)s_max_draw_ms,(unsigned long)s_max_tick_ms,(unsigned long)s_max_gap_ms,s_hits,s_clock_skips);
+            s_frames=s_hits=s_clock_skips=0; s_max_draw_ms=s_max_tick_ms=s_max_gap_ms=0;
+        }
+    }
+}
 static void frame_timer_callback(void *data) {
     s_frame_timer=NULL;
     // time_ms() jumps by about a second around each second boundary in the
@@ -300,71 +480,7 @@ static void frame_timer_callback(void *data) {
     if(!s_paused) {
         if(elapsed>120) elapsed=120;
         s_accumulator+=elapsed*TICRATE;
-        while(s_accumulator>=1000) {
-            s_accumulator-=1000;
-            g_pebble_input.forward_move=g_pebble_input.button_attack ? 0 : (s_up-s_down)*25;
-            g_pebble_input.side_move=0;
-            if(g_pebble_input.button_attack && (s_up || s_down)) {
-                g_pebble_input.angle_turn+=(s_up-s_down)*900;
-            }
-            if(s_tilt_mode) {
-                AccelData accel;
-                if(accel_service_peek(&accel)==0 && !accel.did_vibrate) {
-                    int16_t ax=accel.x;
-                    int16_t deadzone=100;
-                    if(abs(ax)>deadzone) {
-                        int16_t diff=abs(ax)-deadzone;
-                        if(diff>600) diff=600;
-                        int dir=(ax>0 ? -1 : 1)*(s_invert ? -1 : 1);
-                        if(s_tilt_mode==1) {
-                            int32_t turn=g_pebble_input.angle_turn + dir * diff * s_sensitivity;
-                            if(turn>30000) turn=30000;
-                            if(turn<-30000) turn=-30000;
-                            g_pebble_input.angle_turn=turn;
-                        } else if(s_tilt_mode==2) {
-                            g_pebble_input.side_move=(dir>0 ? -25 : 25);
-                        }
-                    }
-                }
-            }
-            uint32_t tick_start=now_ms();
-            int old_health=_g_player.health;
-#if defined PDOOM_PLAYTEST
-            // Playtest build only: holding Down for 2 s exits the level, so the
-            // emulator check (which can press one button at a time) can visit
-            // every map.
-            static int s_down_tics;
-            s_down_tics=s_down ? s_down_tics+1 : 0;
-            if(s_down_tics==2*TICRATE && _g_gamestate==GS_LEVEL) {
-                APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST warp");
-                G_ExitLevel();
-            }
-#endif
-            G_BuildTiccmd(); G_Ticker(); ++_g_gametic;
-            if(_g_player.message) {
-                s_message=_g_player.message; s_message_until=now_ms()+2000;
-                _g_player.message=NULL;
-            }
-            if(_g_gamestate!=s_last_state) {
-                s_last_state=_g_gamestate;
-                APP_LOG(APP_LOG_LEVEL_INFO,"state %d map %d zone%lu",_g_gamestate,_g_gamemap,
-                    (unsigned long)Z_GetTotalFreeMemory());
-            }
-            if(_g_player.health<old_health) {
-                ++s_hits;
-                if(s_vibe_enabled) vibes_double_pulse();
-            }
-            int32_t tick_ms=(int32_t)(now_ms()-tick_start);
-            if(tick_ms>(int32_t)s_max_tick_ms) s_max_tick_ms=tick_ms;
-            if(_g_gametic%105==0 && _g_player.mo) {
-                APP_LOG(APP_LOG_LEVEL_INFO,"tick %ld pos %ld,%ld hp%d ammo%d kills%d frames%u heap%lu zone%lu",_g_gametic,
-                    _g_player.mo->x>>16,_g_player.mo->y>>16,_g_player.health,
-                    _g_player.ammo[0],_g_player.killcount,s_frames,(unsigned long)heap_bytes_free(),
-                    (unsigned long)Z_GetTotalFreeMemory());
-                APP_LOG(APP_LOG_LEVEL_INFO,"timing draw%lu tick%lu gap%lu hits%u skips%u",(unsigned long)s_max_draw_ms,(unsigned long)s_max_tick_ms,(unsigned long)s_max_gap_ms,s_hits,s_clock_skips);
-                s_frames=s_hits=s_clock_skips=0; s_max_draw_ms=s_max_tick_ms=s_max_gap_ms=0;
-            }
-        }
+        if(!guarded(run_tics)) { enter_fatal(); s_accumulator=0; }
     } else s_accumulator=0;
     if(s_canvas_layer) layer_mark_dirty(s_canvas_layer);
     s_frame_timer=app_timer_register(s_paused ? 200 : FRAME_INTERVAL_MS,frame_timer_callback,NULL);
@@ -391,56 +507,84 @@ static void touch_handler(const TouchEvent *e,void *context) {
         s_touching=false;
     }
 }
-static void restart(void) {
+// Start at map 1 with the given skill, or at the checkpoint (continue).
+static __attribute__((noinline)) void start_game(bool from_checkpoint) {
+    checkpoint_t c;
     APP_LOG(APP_LOG_LEVEL_INFO,"new game: zone%lu heap%lu",(unsigned long)Z_GetTotalFreeMemory(),
         (unsigned long)heap_bytes_free());
 #if defined PDOOM_PLAYTEST
     APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST build: player invulnerable");
 #endif
     page(GAME);
-    G_DeferedInitNew(sk_medium);
+    if(from_checkpoint && read_checkpoint(&c)) {
+        s_restore_pending=true;
+        G_DeferedInitNewMap((skill_t)c.skill,c.map);
+    } else {
+        s_restore_pending=false;
+        G_DeferedInitNew((skill_t)s_skill);
+    }
     play_doom_riff_haptic();
     if(s_speaker_enabled) start_doom_speaker_music();
 }
+// Reload the current level with the inventory it was entered with.
+static void restart_level(void) {
+    s_restore_pending=true;
+    _g_player.playerstate=PST_REBORN;
+}
 static void move_choice(int step) {
-    int count=(s_page==PAUSE) ? 5 : (s_page==SETTINGS) ? 6 : 3;
-    s_choice=(s_choice+count+step)%count; dirty();
+    const char *labels[6]; uint8_t actions[6];
+    int count=menu(labels,actions);
+    if(count) s_choice=(s_choice+count+step)%count;
+    dirty();
 }
 static void up_press(ClickRecognizerRef r,void *c) { if(s_paused) move_choice(-1); else s_up=true; }
 static void up_release(ClickRecognizerRef r,void *c) { s_up=false; }
 static void down_press(ClickRecognizerRef r,void *c) { if(s_paused) move_choice(1); else s_down=true; }
 static void down_release(ClickRecognizerRef r,void *c) { s_down=false; }
 static void select_press(ClickRecognizerRef r,void *c) {
-    if(s_page==SETTINGS) {
-        if(s_choice==0) { s_sensitivity=s_sensitivity%3+1; persist_write_int(1,s_sensitivity); }
-        else if(s_choice==1) { s_invert=!s_invert; persist_write_bool(2,s_invert); }
-        else if(s_choice==2) { s_tilt_mode=(s_tilt_mode+1)%3; persist_write_int(3,s_tilt_mode); }
-        else if(s_choice==3) {
+    if(s_page==HELP) { page(s_parent); return; }
+    if(s_page==FATAL) return;
+    if(s_page!=GAME) {
+        const char *labels[6]; uint8_t actions[6];
+        int count=menu(labels,actions);
+        if(s_choice>=count) return;
+        uint8_t previous=s_page;
+        switch(actions[s_choice]) {
+        case A_CONTINUE: start_game(true); break;
+        case A_NEW: page(SKILL); s_choice=s_skill==sk_baby ? 0 : s_skill==sk_hard ? 2 : 1; dirty(); break;
+        case A_EASY: case A_NORMAL: case A_HARD:
+            // Easy is Doom's "I'm too young to die": half damage, double ammo.
+            s_skill=actions[s_choice]==A_EASY ? sk_baby : actions[s_choice]==A_HARD ? sk_hard : sk_medium;
+            persist_write_int(KEY_SKILL,s_skill);
+            start_game(false); break;
+        case A_SETTINGS: s_parent=previous; page(SETTINGS); break;
+        case A_CONTROLS: s_parent=previous; page(HELP); break;
+        case A_RESUME: page(GAME); break;
+        case A_RESTART: page(GAME); restart_level(); break;
+        case A_QUIT: window_stack_pop(true); break;
+        case A_SENS: s_sensitivity=s_sensitivity%3+1; persist_write_int(1,s_sensitivity); break;
+        case A_TURN: s_invert=!s_invert; persist_write_bool(2,s_invert); break;
+        case A_TILT: s_tilt_mode=(s_tilt_mode+1)%3; persist_write_int(3,s_tilt_mode); break;
+        case A_SPEAKER:
             s_speaker_enabled=!s_speaker_enabled;
             persist_write_bool(5,s_speaker_enabled);
             if(!s_speaker_enabled) stop_doom_speaker_music();
             else if(s_parent==GAME) start_doom_speaker_music();
+            break;
+        case A_HAPTIC: s_vibe_enabled=!s_vibe_enabled; persist_write_bool(4,s_vibe_enabled); break;
+        case A_BACK: page(s_parent); break;
         }
-        else if(s_choice==4) { s_vibe_enabled=!s_vibe_enabled; persist_write_bool(4,s_vibe_enabled); }
-        else page(s_parent);
         dirty(); return;
     }
-    if(s_page==HELP) { page(s_parent); return; }
-    if(s_page==TITLE || s_page==PAUSE) {
-        int choice=s_choice; uint8_t previous=s_page;
-        if(previous==PAUSE && choice==0) page(GAME);
-        else if((previous==TITLE && choice==0) || (previous==PAUSE && choice==1)) restart();
-        else if(previous==PAUSE && choice==4) window_stack_pop(true);
-        else { s_parent=previous; page(choice==(previous==TITLE ? 1 : 2) ? SETTINGS : HELP); }
-        return;
-    }
-    if(_g_gamestate==GS_LEVEL && _g_player.playerstate==PST_DEAD) _g_player.playerstate=PST_REBORN;
+    if(_g_gamestate==GS_LEVEL && _g_player.playerstate==PST_DEAD) restart_level();
     else if(next_map_exists()) G_WorldDone();
-    else if(_g_gamestate!=GS_LEVEL) restart();
+    else if(_g_gamestate!=GS_LEVEL) start_game(false);
     else g_pebble_input.button_attack=true;
 }
 static void select_release(ClickRecognizerRef r,void *c) { g_pebble_input.button_attack=false; }
 static void back_click(ClickRecognizerRef r,void *c) {
+    if(s_page==FATAL) { window_stack_pop(true); return; }
+    if(s_page==SKILL) { page(TITLE); return; }
     if(s_page==SETTINGS || s_page==HELP) { page(s_parent); return; }
     if(s_page==TITLE) { window_stack_pop(true); return; }
     if(s_page==PAUSE) { page(GAME); return; }
@@ -479,6 +623,10 @@ static void main_window_unload(Window *window) {
     if(s_touch_subscribed) touch_service_unsubscribe();
     layer_destroy(s_canvas_layer); s_canvas_layer=NULL;
 }
+static void start_engine(void) {
+    const char *argv[]={"pdoom"};
+    D_DoomMain(1,argv);
+}
 int main(void) {
     int saved=persist_read_int(1);
     if(saved>=1 && saved<=3) s_sensitivity=saved;
@@ -489,9 +637,16 @@ int main(void) {
     }
     if(persist_exists(4)) s_vibe_enabled=persist_read_bool(4);
     if(persist_exists(5)) s_speaker_enabled=persist_read_bool(5);
+    if(persist_exists(KEY_SKILL)) {
+        int skill=persist_read_int(KEY_SKILL);
+        if(skill>=sk_baby && skill<=sk_hard) s_skill=skill;
+    }
     app_focus_service_subscribe(focus_changed);
-    const char *argv[]={"pdoom"};
-    D_DoomMain(1,argv);
+    if(!guarded(start_engine)) enter_fatal();   // engine start-up failed
+    else {
+        checkpoint_t c;
+        APP_LOG(APP_LOG_LEVEL_INFO,"title: continue %d",read_checkpoint(&c) ? 1 : 0);
+    }
     s_main_window=window_create();
     if(!s_main_window) I_Error("Window allocation");
     window_set_background_color(s_main_window,GColorBlack);

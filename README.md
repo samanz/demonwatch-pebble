@@ -11,8 +11,10 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - Back once: use door or exit switch.
 - Hold Select and click Back: cycle owned weapons.
 - Tilt the watch left / right: turn (default) or strafe, chosen in Settings.
-- Double Back: open the pause menu. Up/Down choose Resume, Restart, Settings, Controls, or Quit; Select confirms. Back resumes.
-- Launch opens a title menu: New game, Settings, Controls.
+- Double Back: open the pause menu. Up/Down choose Resume, Restart level, Settings, Controls, or Quit; Select confirms. Back resumes.
+- Launch opens a title menu: Continue (when a checkpoint exists), New game, Settings, Controls. New game asks for a difficulty: Easy (Doom's "too young to die": half damage, double ammo), Normal, or Hard; the choice is remembered.
+- Checkpoints: entering a level (new game or next map) saves the map, difficulty and inventory. Continue resumes there after quitting; dying and the pause menu's "Restart level" reload the level with that inventory (health at least 50). Keys are per level, as in Doom. Finishing the episode clears the checkpoint.
+- If the engine hits a fatal error, an error page replaces the game (Back exits) instead of the app freezing.
 - Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), speaker music, and haptics.
 - Losing app focus clears held inputs and pauses gameplay.
 - Hold Back: system exit.
@@ -28,7 +30,7 @@ The Emery emulator was used to exercise movement, pickup, door use, killing enem
 
 The renderer uses 120 x 114 logical pixels scaled to a 200 x 190 view, plus a health/ammo/armor HUD with keycard squares (blue, yellow, red) at the right edge. Engine hint and pickup messages ("You need a blue key...", "Picked up a shotgun.") appear at the top for 2 seconds; the level-end screen shows kills and time. Sector lighting follows Doom64KB: each sector's light level picks one of 32 64-entry light tables (lights of 160 and above are full bright, 128 dim, 96 dark), horizontal and vertical walls get Doom's fake contrast, gun flashes brighten, and flicker/strobe/glow sector specials animate. Floors and ceilings are solid colours; the sky is a flat blue-grey. Freedoom art is converted with a mild colour boost and a 2x2 ordered dither so greys and browns keep their shading on the 64-colour display. Engine simulation runs at 35 ticks per second. Physical Emery hardware running PebbleOS 4.38.2 has now launched successfully and logged movement. Extended gameplay, battery use, and touch feel still need hardware testing. There is no sound, save system, full E1M1, or arbitrary WAD support. This is a playable prototype, not an App Store release.
 
-SDK measurements: resources 145,013 bytes; static RAM footprint 58,317 bytes; initial available heap 72,755 bytes. Runtime free heap in this arena is approximately 16 KB. The loaded image (58,320 bytes) must fit the SDK header's 65,535-byte field, leaving about 7.2 KB of code/static-data headroom.
+SDK measurements: resources 217,189 bytes (of 256 KB); initial available heap 69,970 bytes. The loaded image (61,104 bytes) must fit the SDK header's 65,535-byte field, leaving about 4.4 KB of code/static-data headroom.
 
 Space-saving conventions (keep them when adding content):
 - `states[]` stores each action as an 8-bit index into `actionfuncs[]` and is packed to 8 bytes per state. Its fields must stay in the same order as the positional initializers in `info.c`; `tests/test_info.c` checks every index is in range.
@@ -36,7 +38,7 @@ Space-saving conventions (keep them when adding content):
 - Demo playback, SRAM save/load, the title demo loop, and engine `printf` progress messages are compiled out under `PEBBLE_EMERY`.
 - Scratch tables needed only at startup (such as the sprite-frame table) are heap-allocated and freed.
 
-Memory: the Doom zone is 30 KB (falling back to 26/22/18 KB if the heap is short). About 4 KB of it holds permanent data (sprite frame tables store only the front view; TEXTURE1 carries names only), leaving about 26.6 KB per level. Map lumps (THINGS through BLOCKMAP after each `E1Mx` marker) are released on every level load. Global lumps stay resident; sprite and wall patches stream through one scratch buffer. The app log reports free zone memory (`zone`) every 105 tics and on every game-state change.
+Memory: the Doom zone is 28 KB (falling back to 24/20/18 KB if the heap is short), leaving about 7 KB of PebbleOS heap during play. About 6 KB of the zone holds permanent data (sprite frame tables store only the front view; TEXTURE1 carries names only; 2 KB of light tables), leaving about 22.8 KB per level; the tightest map keeps at least 7.5 KB free. The game draws at 30 frames per second (the simulation stays at 35 tics per second) to save battery. Map lumps (THINGS through BLOCKMAP after each `E1Mx` marker) are released on every level load. Global lumps stay resident; sprite and wall patches stream through one scratch buffer. The app log reports free zone memory (`zone`) every 105 tics and on every game-state change.
 
 ## Making levels
 
