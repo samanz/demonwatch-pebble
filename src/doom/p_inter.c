@@ -613,6 +613,9 @@ void P_DamageMobj(mobj_t __far* target, mobj_t __far* inflictor, mobj_t __far* s
   // thus kick away unless using the chainsaw.
 
   if (inflictor && !(target->flags & MF_NOCLIP) &&
+#if defined PDOOM_PLAYTEST
+      !player &&  // playtest bot walks straight lines; don't knock it off course
+#endif
       (!source || !P_MobjIsPlayer(source) ||
        P_MobjIsPlayer(source)->readyweapon != wp_chainsaw))
     {

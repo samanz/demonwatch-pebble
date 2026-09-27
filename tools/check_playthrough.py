@@ -1,9 +1,13 @@
 """Play the arena in the Emery emulator from spawn to the exit switch.
 
-Steers by the player position the app logs every 105 tics: at each waypoint
-it uses (opens the door ahead), walks, and fights and retries when blocked.
-Saves screenshots and the log in work/. Run from the project root.
+Builds and installs the PDOOM_PLAYTEST variant (invulnerable player, in
+build-playtest/) so the result depends on the engine and level flow, not on
+how well the bot shoots. Steers by the player position the app logs every
+105 tics: at each waypoint it walks, and when blocked it reopens the door
+ahead and fights. Saves screenshots and the log in work/. Run from the
+project root.
 """
+import os
 import re
 import subprocess
 import sys
@@ -15,7 +19,11 @@ LOG = Path('work/complete-playtest.log')
 # Player x when standing against door 1, door 2, door 3, and the exit wall.
 WAYPOINTS = [(490, 'door1'), (1130, 'door2'), (1770, 'door3'), (2340, 'exit')]
 
-subprocess.run(cmd + ['install', '--emulator', 'emery', 'build/pdoom.pbw'],
+build = subprocess.run(cmd + ['build'], env=dict(os.environ, PDOOM_PLAYTEST='1'),
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=600)
+if build.returncode:
+    sys.exit('Playtest build failed:\n' + build.stdout[-3000:])
+subprocess.run(cmd + ['install', '--emulator', 'emery', 'build-playtest/pdoom.pbw'],
                check=True, timeout=30, stdout=subprocess.DEVNULL)
 # Hold the simulated watch flat: tilt steering is on by default, and the
 # emulator keeps whatever accelerometer state an earlier session left behind.
@@ -108,6 +116,7 @@ with LOG.open('w') as f:
 
 text = report()
 print('\n'.join(x for x in text.splitlines() if 'pkjs>' not in x))
+assert 'PLAYTEST build' in text, 'Expected the invulnerable playtest build to be running'
 assert 'FATAL' not in text and 'Invalid lump' not in text and 'App fault' not in text, 'Engine error'
 assert 'pos 128,256 hp100 ammo50 kills0' in text, 'Must start with initial player state'
 assert re.search(r'kills[1-9]', text), 'Combat rooms must be engaged'

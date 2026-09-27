@@ -570,6 +570,11 @@ void G_PlayerReborn (void)
     int16_t cheats = p->cheats;
     memset (p, 0, sizeof(*p));
     p->cheats = cheats;
+#if defined PDOOM_PLAYTEST
+    // Emulator playtest build only (tools/check_playthrough.py): the bot
+    // cannot aim, so it must not be able to die.
+    p->cheats |= CF_GODMODE;
+#endif
 
     _g_player.killcount = killcount;
     _g_player.itemcount = itemcount;

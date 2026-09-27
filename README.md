@@ -65,7 +65,7 @@ gcc -std=c11 -g -fsanitize=address,undefined tests/test_ascii.c src/pebble/ascii
 
 `sh tools/check_all.sh` builds the app and runs all of the above plus the `tests/test_info.c` table check; add `--emulator` to include the playthrough.
 
-Create `work/` before running native tests. `tools/check_playthrough.py` levels the emulator accelerometer, then steers a freshly installed app from spawn to the exit switch using the logged player position (opening doors, fighting and retrying when blocked), saves screenshots and logs in `work/`, and checks for the level-complete state change (`state 1 map 1`). Its bot shoots without aiming and can die in combat on medium skill, so a failure reading "Player died" is not by itself an engine regression. `tools/check_menus.py` captures menu and settings-persistence screenshots.
+Create `work/` before running native tests. `tools/check_playthrough.py` builds the playtest variant (`PDOOM_PLAYTEST=1 pebble build`, output in `build-playtest/`, never `build/`), levels the emulator accelerometer, then steers the app from spawn to the exit switch using the logged player position (walking, reopening doors and fighting when blocked). It saves screenshots and logs in `work/` and checks for the level-complete state change (`state 1 map 1`). The playtest variant makes the player invulnerable, immune to knockback, and able to walk through monsters, because the bot cannot aim; walls, doors, switches, pickups, and combat are otherwise unchanged. None of this is compiled into the release build. `tools/check_menus.py` captures menu and settings-persistence screenshots.
 
 The project is a git repository; on this machine git is available inside WSL, not on Windows.
 

@@ -402,6 +402,13 @@ static boolean PIT_CheckThing(mobj_t __far* thing)
       return !solid;
     }
 
+#if defined PDOOM_PLAYTEST
+  // The playtest bot cannot aim at monsters beside it, so let it walk
+  // through them. Walls, doors and switches still apply.
+  if (tmthing->type == MT_PLAYER && (thing->flags & MF_COUNTKILL))
+    return true;
+#endif
+
   return !(thing->flags & MF_SOLID);
 }
 

@@ -355,6 +355,9 @@ static void touch_handler(const TouchEvent *e,void *context) {
     }
 }
 static void restart(void) {
+#if defined PDOOM_PLAYTEST
+    APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST build: player invulnerable");
+#endif
     page(GAME);
     G_DeferedInitNew(sk_medium);
     play_doom_riff_haptic();

@@ -1,7 +1,10 @@
 import os.path
 
 top = '.'
-out = 'build'
+# PDOOM_PLAYTEST=1 builds an invulnerable-player variant for the emulator
+# playthrough into its own directory, so it can never replace build/pdoom.pbw.
+PLAYTEST = os.environ.get('PDOOM_PLAYTEST') == '1'
+out = 'build-playtest' if PLAYTEST else 'build'
 
 def options(ctx):
     ctx.load('pebble_sdk')
@@ -32,6 +35,8 @@ def build(ctx):
         '-DPEBBLE_EMERY',
         '-DC_ONLY=1',
     ]
+    if PLAYTEST:
+        cflags.append('-DPDOOM_PLAYTEST')
 
     includes = [
         ctx.path.abspath(),
