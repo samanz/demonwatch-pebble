@@ -51,6 +51,7 @@ boolean P_TryMove(mobj_t __far* thing, fixed_t x, fixed_t y);
 boolean P_TeleportMove(mobj_t __far* thing, fixed_t x, fixed_t y, boolean boss);
 boolean P_CheckSight(mobj_t __far* t1, mobj_t __far* t2);
 void    P_UseLines(player_t *player);
+boolean P_UsableLineAhead(player_t *player);   // Pebble tap: use or fire?
 
 fixed_t P_AimLineAttack(mobj_t __far*t1, angle_t angle, fixed_t distance);
 

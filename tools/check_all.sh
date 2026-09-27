@@ -28,5 +28,6 @@ if [ "$1" = "--emulator" ]; then
     python3 tools/check_maps.py > work/check-maps-out.txt 2>&1 || {
         tr -d '\000' < work/check-maps-out.txt | grep -v pkjs | tail -20; exit 1; }
     tr -d '\000' < work/check-maps-out.txt | grep -E 'state |zone free|PASS'
+    python3 tools/check_tap.py | tail -2
 fi
 echo "ALL CHECKS PASSED"

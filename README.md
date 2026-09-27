@@ -7,7 +7,7 @@ Native Doom64KB-derived game for Pebble Time 2 (Emery), built with Pebble SDK 4.
 Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Emery. The development build is `build/pdoom.pbw`.
 
 - Up / Down: move forward / backward.
-- Hold Select: fire. While held, Up / Down turn left / right.
+- Tap Select: fire one shot (a tap holds the trigger for 3 tics, so even a very quick tap fires). Hold Select: keep firing; while held, Up / Down turn left / right.
 - Back once: use door or exit switch.
 - Hold Select and click Back: cycle owned weapons.
 - Tilt the watch left / right: turn (default) or strafe, chosen in Settings.
@@ -18,7 +18,7 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - Settings save touch/tilt sensitivity (gentle/normal/fast), turn direction, tilt mode (off/steer/strafe), and haptics (a buzz when you take damage). There is no music.
 - Losing app focus clears held inputs and pauses gameplay.
 - Hold Back: system exit.
-- Touch drag horizontally: turn; double tap: cycle weapons. Touch requires compatible firmware and remains unverified on a physical watch.
+- Touch: tap the screen to act: it uses a door, switch or lift straight ahead (within Doom's 64-unit use range), and otherwise fires one shot; an already open door counts as nothing ahead, so tapping in a doorway fires. On the death and level-end screens a tap moves on like Select. Drag horizontally to turn; touch and hold (half a second) to cycle weapons.
 - After death: Select retries the current level.
 - After the exit switch: Select continues to the next map (E1M2, E1M3, … when present, keeping inventory). After the last map, Select starts a new game.
 

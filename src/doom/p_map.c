@@ -1112,6 +1112,53 @@ void P_UseLines (player_t*  player)
       S_StartSound (usething, sfx_noway);
   }
 
+#if defined PEBBLE_EMERY
+//
+// P_UsableLineAhead
+// Pebble context action: would pressing use now activate a line? Same trace
+// as P_UseLines, without side effects. A manual door that is already open
+// does not count, so tapping at an open doorway fires instead of closing it.
+//
+static boolean usable_found;
+
+static boolean PTR_ProbeTraverse(intercept_t* in)
+{
+  const line_t __far* line = in->d.line;
+  int16_t special = LN_SPECIAL(line);
+
+  if (special >= 26 && special <= 28)
+    special = 1;   // key doors behave like the plain manual door here
+  if (special == 1)
+  {
+    const sector_t __far* door = LN_BACKSECTOR(line);
+    if (door && door->ceilingheight > door->floorheight)
+      special = 0;   // open or opening: look through it
+  }
+
+  if (!special)
+  {
+    P_LineOpening (line);
+    return _g_openrange > 0;   // keep looking through openings
+  }
+
+  usable_found = P_PointOnLineSide (usething->x, usething->y, line) != 1;
+  return false;
+}
+
+boolean P_UsableLineAhead(player_t* player)
+{
+  int16_t angle = player->mo->angle >> ANGLETOFINESHIFT;
+  fixed_t x1 = player->mo->x;
+  fixed_t y1 = player->mo->y;
+
+  usething = player->mo;
+  usable_found = false;
+  P_PathTraverse (x1, y1, x1 + (USERANGE>>FRACBITS)*finecosine(angle),
+                  y1 + (USERANGE>>FRACBITS)*finesine(angle), PT_ADDLINES, PTR_ProbeTraverse);
+  return usable_found;
+}
+#endif
+
 
 //
 // RADIUS ATTACK

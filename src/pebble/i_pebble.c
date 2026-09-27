@@ -12,19 +12,24 @@
 #include "../doom/i_system.h"
 #include "../doom/w_wad.h"
 #include "../doom/z_zone.h"
+#include "../doom/p_map.h"
 
 static Window *s_main_window;
 static Layer *s_canvas_layer;
 static AppTimer *s_frame_timer;
 pebble_input_state_t g_pebble_input;
-static bool s_touching, s_up, s_down;
+static bool s_touching, s_up, s_down, s_select_held;
+// A Select tap keeps the trigger down for at least this many tics, so a tap
+// between two 35 Hz tics still fires one shot.
+#define TAP_FIRE_TICS 3
+static uint8_t s_fire_tics;
 enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL };
 static uint8_t s_page=TITLE, s_parent=TITLE, s_choice, s_sensitivity=2, s_tilt_mode=1, s_skill=sk_medium;
 static bool s_invert, s_vibe_enabled=true;
 #define s_paused (s_page != GAME)
 static bool s_touch_subscribed;
 static int16_t s_touch_start_x, s_touch_start_y, s_touch_last_x;
-static uint32_t s_touch_at, s_last_tap, s_last_tick, s_accumulator;
+static uint32_t s_touch_at, s_last_tick, s_accumulator;
 static unsigned s_frames;
 static uint32_t s_max_draw_ms, s_max_tick_ms, s_max_gap_ms;
 static unsigned s_hits, s_clock_skips;
@@ -68,7 +73,8 @@ static uint32_t now_ms(void) {
 
 static void clear_input(void) {
     memset(&g_pebble_input,0,sizeof(g_pebble_input));
-    s_up=s_down=s_touching=false;
+    s_up=s_down=s_touching=s_select_held=false;
+    s_fire_tics=0;
 }
 static void dirty(void) { if(s_canvas_layer) layer_mark_dirty(s_canvas_layer); }
 static void page(uint8_t next) {
@@ -167,7 +173,7 @@ static void draw_menu(GContext *ctx) {
     static const char *const titles[]={"pDOOM","","PAUSED","SETTINGS","CONTROLS","DIFFICULTY","ERROR"};
     text(ctx,titles[s_page],12,FONT_KEY_GOTHIC_28_BOLD);
     if(s_page==HELP) {
-        const char *lines[]={"Up / Down: move","Hold Select: fire","Tilt: steer / strafe","Drag: look / turn","Double tap: weapon","Back: use door","Double Back: pause"};
+        const char *lines[]={"Up / Down: move","Select: fire","Tilt / drag: turn","Tap: open / fire","Hold screen: weapon","Back: use door","Double Back: pause"};
         for(int i=0;i<7;++i) text(ctx,lines[i],46+22*i,FONT_KEY_GOTHIC_18);
     } else if(s_page==FATAL) {
         graphics_draw_text(ctx,"pDOOM hit an error and stopped.",fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
@@ -279,6 +285,7 @@ static void run_tics(void) {
         }
 #endif
         G_BuildTiccmd(); G_Ticker(); ++_g_gametic;
+        if(s_fire_tics && !--s_fire_tics && !s_select_held) g_pebble_input.button_attack=false;
         if(_g_player.message) {
             s_message=_g_player.message; s_message_until=now_ms()+2000;
             _g_player.message=NULL;
@@ -327,6 +334,7 @@ static void frame_timer_callback(void *data) {
     if(s_canvas_layer) layer_mark_dirty(s_canvas_layer);
     s_frame_timer=app_timer_register(s_paused ? 200 : FRAME_INTERVAL_MS,frame_timer_callback,NULL);
 }
+static void touch_tap(void);
 static void touch_handler(const TouchEvent *e,void *context) {
     if(!e || s_paused) return;
     uint32_t now=now_ms();
@@ -341,10 +349,10 @@ static void touch_handler(const TouchEvent *e,void *context) {
         if(turn< -30000) turn=-30000;
         g_pebble_input.angle_turn=turn;
     } else if(e->type==TouchEvent_Liftoff && s_touching) {
-        if(abs(e->x-s_touch_start_x)<8 && abs(e->y-s_touch_start_y)<8 && now-s_touch_at<250) {
-            if(s_last_tap && now-s_last_tap<350) {
-                g_pebble_input.weapon_cycle=true; s_last_tap=0;
-            } else s_last_tap=now;
+        // A touch that stays put is a tap (action) or, held, a weapon change.
+        if(abs(e->x-s_touch_start_x)<8 && abs(e->y-s_touch_start_y)<8) {
+            if(now-s_touch_at<250) touch_tap();
+            else if(now-s_touch_at>=500) g_pebble_input.weapon_cycle=true;
         }
         s_touching=false;
     }
@@ -381,6 +389,15 @@ static void up_press(ClickRecognizerRef r,void *c) { if(s_paused) move_choice(-1
 static void up_release(ClickRecognizerRef r,void *c) { s_up=false; }
 static void down_press(ClickRecognizerRef r,void *c) { if(s_paused) move_choice(1); else s_down=true; }
 static void down_release(ClickRecognizerRef r,void *c) { s_down=false; }
+// On the death / level-end screens Select (or a tap) moves on; returns
+// whether it did.
+static bool advance_screen(void) {
+    if(_g_gamestate==GS_LEVEL && _g_player.playerstate==PST_DEAD) restart_level();
+    else if(next_map_exists()) G_WorldDone();
+    else if(_g_gamestate!=GS_LEVEL) start_game(false);
+    else return false;
+    return true;
+}
 static void select_press(ClickRecognizerRef r,void *c) {
     if(s_page==HELP) { page(s_parent); return; }
     if(s_page==FATAL) return;
@@ -410,12 +427,18 @@ static void select_press(ClickRecognizerRef r,void *c) {
         }
         dirty(); return;
     }
-    if(_g_gamestate==GS_LEVEL && _g_player.playerstate==PST_DEAD) restart_level();
-    else if(next_map_exists()) G_WorldDone();
-    else if(_g_gamestate!=GS_LEVEL) start_game(false);
-    else g_pebble_input.button_attack=true;
+    if(!advance_screen()) { g_pebble_input.button_attack=true; s_select_held=true; s_fire_tics=TAP_FIRE_TICS; }
 }
-static void select_release(ClickRecognizerRef r,void *c) { g_pebble_input.button_attack=false; }
+// Screen tap: use a door or switch straight ahead, otherwise fire one shot.
+static void touch_tap(void) {
+    if(advance_screen()) return;
+    if(_g_player.mo && P_UsableLineAhead(&_g_player)) g_pebble_input.button_use=true;
+    else { g_pebble_input.button_attack=true; s_fire_tics=TAP_FIRE_TICS; }
+}
+static void select_release(ClickRecognizerRef r,void *c) {
+    s_select_held=false;
+    if(!s_fire_tics) g_pebble_input.button_attack=false;   // else released after the tap's tics
+}
 static void back_click(ClickRecognizerRef r,void *c) {
     if(s_page==FATAL) { window_stack_pop(true); return; }
     if(s_page==SKILL) { page(TITLE); return; }
@@ -424,7 +447,13 @@ static void back_click(ClickRecognizerRef r,void *c) {
     if(s_page==PAUSE) { page(GAME); return; }
     if(click_number_of_clicks_counted(r)>1) page(PAUSE);
     else if(g_pebble_input.button_attack) g_pebble_input.weapon_cycle=true;
+#if defined PDOOM_PLAYTEST
+    // The emulator has no touch input: in the playtest build a single Back
+    // runs the screen-tap action so tools/check_tap.py can test it.
+    else touch_tap();
+#else
     else g_pebble_input.button_use=true;
+#endif
 }
 static void focus_changed(bool focused) { if(!focused && s_page==GAME) page(PAUSE); }
 static void click_config_provider(void *context) {
