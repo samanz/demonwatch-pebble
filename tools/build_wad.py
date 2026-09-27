@@ -26,6 +26,20 @@ RESOURCE_LIMIT = 262144 - 4096   # Emery resource budget, minus headroom
 ZONE_BUDGET = 20000
 
 
+def colormap():
+    """32 light levels x 64 Pebble colours (src/doom/r_draw.c COLORMAP_STRIDE).
+    Level 0 is full bright; each level scales every 2-bit channel by
+    (32 - level) / 32 and rounds, so light 160+ is untouched, 128 is dimmer,
+    96 is dark and 64 is very dark."""
+    out = bytearray()
+    for level in range(32):
+        f = (32 - level) / 32
+        for c in range(64):
+            r, g, b = (c >> 4) & 3, (c >> 2) & 3, c & 3
+            out += bytes([int(r * f + 0.5) * 16 + int(g * f + 0.5) * 4 + int(b * f + 0.5)])
+    return bytes(out)
+
+
 def placeholder_sprite(name):
     if name[:4] in ('PUNG', 'PISG', 'PISF', 'SHTG', 'SHTF', 'CHGG', 'CHGF'):
         return patch(64, 64, 32, -100, lambda x, y: 42 if abs(x - 32) < 8 + y // 4 else None)
@@ -51,7 +65,7 @@ def build(maps=MAPS):
         return fallback(name)
 
     textures = texture_names()
-    lumps = [('COLORMAP', bytes(range(256)))]
+    lumps = [('COLORMAP', colormap())]
     report = []
     sys.path.insert(0, str(ROOT / 'tools/levels'))
     for module_name in maps:

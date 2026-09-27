@@ -28,7 +28,10 @@ def build(ctx):
         '-fno-unwind-tables',
         '-fno-asynchronous-unwind-tables',
         '-DFLAT_SPAN',
-        '-DFLAT_NUKAGE1_COLOR=118',
+        # 6-bit Pebble colours: nukage cycles 8/10/12 (dark green, teal,
+        # green); sky is blue-grey.
+        '-DFLAT_NUKAGE1_COLOR=8',
+        '-DSKY_COLOR=22',
         '-DVIEWWINDOWWIDTH=120',
         '-DVIEWWINDOWHEIGHT=114',
         '-DMAPWIDTH=120',

@@ -50,8 +50,12 @@ static void draw_column(const draw_column_vars_t *dc, int flat, uint8_t color, i
     int lo=dc->yl<0 ? 0 : dc->yl;
     int hi=dc->yh>=VIEWWINDOWHEIGHT ? VIEWWINDOWHEIGHT-1 : dc->yh;
     uint16_t frac=(dc->texturemid >> COLEXTRABITS)+(lo-CENTERY)*dc->fracstep;
+    // Flat colours arrive already lit (R_GetPlaneColor); textures and sprites
+    // go through the sector's 64-entry light table.
+    const uint8_t *light=flat ? NULL : dc->colormap;
     for(int y=lo;y<=hi;++y) {
         uint8_t index=flat ? color : dc->source[frac >> COLBITS];
+        if(light) index=light[index & 63];
         draw_cell(dc->x,y,0xc0 | (index & 63),fuzz);
         frac+=dc->fracstep;
     }
@@ -139,4 +143,12 @@ void ST_PebbleDrawer(uint8_t *fb) {
     int ammo=weaponinfo[_g_player.readyweapon].ammo;
     draw_number(fb, 85, 210, ammo < NUMAMMO ? _g_player.ammo[ammo] : 0, 0xfc);  // Yellow: Ammo
     draw_number(fb, 150, 210, _g_player.armorpoints, 0xcc);   // Green: Armor
+
+    // Keycards: blue, yellow, red squares stacked at the right edge.
+    static const uint8_t key_colors[NUMCARDS] = {0xc3, 0xfc, 0xf0};
+    for (int k = 0; k < NUMCARDS; k++) {
+        if (!_g_player.cards[k]) continue;
+        for (int y = 0; y < 7; y++)
+            memset(fb + (196 + k * 10 + y) * s_fb_width + 190, key_colors[k], 7);
+    }
 }

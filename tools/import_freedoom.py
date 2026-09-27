@@ -3,10 +3,16 @@
 Usage: python3 tools/import_freedoom.py work/freedoom-0.13.0.zip
 
 Sprites: every frame in assets.sprite_frames(), front view, logical size and
-offsets preserved, detail halved (2x2 sampling), colours quantized to the
-Pebble's 64-colour palette. Wall patches: assets.PATCHES, composed from
-Freedoom textures, scaled to the listed width and tiled to 128 rows.
+offsets preserved, detail halved (2x2 sampling). Wall patches: assets.PATCHES,
+composed from Freedoom textures, scaled to the listed width and tiled to 128
+rows.
+
+Colour: the Pebble has 4 levels per channel, which flattens Doom's greys and
+browns into one grey. Each colour gets a mild saturation/brightness boost and
+a 2x2 ordered dither per 2x2 texel block (texel pairs are stored once, so the
+pattern must not split a pair).
 """
+import colorsys
 import struct as st
 import sys
 import zipfile
@@ -27,6 +33,24 @@ def decode(data):
                     pixels[y + j][x] = index
             p += n + 4
     return w, h, left, top, pixels
+
+
+BAYER = ((0, 2), (3, 1))
+
+
+def make_converter(playpal):
+    """Return colour(index, bx, by) -> Pebble colour code for block (bx, by)."""
+    boosted = []
+    for i in range(256):
+        h, l, s = colorsys.rgb_to_hls(*(v / 255 for v in playpal[i * 3:i * 3 + 3]))
+        rgb = colorsys.hls_to_rgb(h, min(1, l * 1.1), min(1, s * 1.25))
+        boosted.append(tuple(v * 255 for v in rgb))
+
+    def colour(index, bx, by):
+        offset = ((BAYER[by & 1][bx & 1] + 0.5) / 4 - 0.5) * 85
+        levels = [int(max(0, min(255, v + offset)) + 42) // 85 for v in boosted[index]]
+        return levels[0] * 16 + levels[1] * 4 + levels[2]
+    return colour
 
 
 def texture_canvas(wad, name):
@@ -57,8 +81,7 @@ def main(path):
         dest.mkdir(exist_ok=True)
         for source, target in [('COPYING.txt', 'Freedoom-COPYING.txt'), ('CREDITS.txt', 'Freedoom-CREDITS.txt')]:
             (dest / target).write_bytes(z.read('freedoom-0.13.0/' + source))
-    pal = wad['PLAYPAL'][:768]
-    colors = [sum(((pal[i * 3 + c] + 42) // 85) * (16, 4, 1)[c] for c in range(3)) for i in range(256)]
+    colour = make_converter(wad['PLAYPAL'][:768])
     art = []
 
     for name in sprite_frames():
@@ -78,7 +101,7 @@ def main(path):
 
         def pixel(x, y, pixels=pixels):
             index = pixels[(y // 2) * 2][(x // 2) * 2]
-            return None if index is None else colors[index]
+            return None if index is None else colour(index, x // 2, y // 2)
         art.append((name, patch(w, h, left, top, pixel)))
 
     for name, (source, width, overlay) in PATCHES.items():
@@ -96,7 +119,7 @@ def main(path):
         def pixel(x, y, canvas=canvas, th=th, tw=tw):
             sx = (x // 2 * 2) * tw // width
             sy = (y // 2 * 2) % th
-            return colors[canvas[sy][min(sx, tw - 1)]]
+            return colour(canvas[sy][min(sx, tw - 1)], x // 2, y // 2)
         art.append((name, patch(width, 128, 0, 0, pixel)))
 
     out = bytearray(b'IWAD' + bytes(8))

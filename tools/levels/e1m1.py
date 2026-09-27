@@ -18,14 +18,14 @@ def build():
     m = Map('E1M1')
 
     # Entry room.
-    m.rect(0, 0, 384, 320, floor=0, ceil=128, floor_col=DARK, ceil_col=GREY, light=176, wall='WALL')
+    m.rect(0, 0, 384, 320, floor=0, ceil=128, floor_col=DARK, ceil_col=GREY, light=192, wall='WALL')
     m.door(160, 320, 224, 336, axis='y')
 
     # Corridor running north, then stairs east up into the courtyard.
-    m.rect(128, 336, 256, 768, floor=0, ceil=112, floor_col=BROWNF, ceil_col=DARK, light=144, wall='BROWN')
+    m.rect(128, 336, 256, 768, floor=0, ceil=112, floor_col=BROWNF, ceil_col=DARK, light=120, wall='BROWN')
     for i, x in enumerate((256, 288, 320)):
         m.rect(x, 640, x + 32, 768, floor=16 * (i + 1), ceil=176, floor_col=BROWNF, ceil_col=DARK,
-               light=160, wall='BROWN')
+               light=136, wall='BROWN')
         m.edge((x, 640), (x, 768), lower='STEP')
     # Window from the corridor into the courtyard (sill 48, lintel 96).
     m.rect(256, 448, 352, 544, floor=48, ceil=96, floor_col=GREY, ceil_col=GREY, light=160, wall='METAL')
@@ -46,7 +46,7 @@ def build():
     m.door(1024, 544, 1040, 608, axis='x', floor=64)
     m.sector([(1040, 480), (1040, 672), (1072, 704), (1328, 704), (1360, 672), (1360, 480),
               (1328, 448), (1072, 448)], floor=64, ceil=192, floor_col=DARK, ceil_col=GREY,
-             light=176, wall='GRAY')
+             light=144, wall='GRAY')
     for a, b in (((1072, 704), (1168, 704)), ((1232, 704), (1328, 704)), ((1360, 480), (1360, 672))):
         m.edge(a, b, mid='COMP')
     for a, b in (((1040, 672), (1072, 704)), ((1328, 704), (1360, 672)),

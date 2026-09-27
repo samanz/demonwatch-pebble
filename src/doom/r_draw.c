@@ -1016,11 +1016,40 @@ static CONSTFUNC int16_t R_PointToDist(int16_t x, int16_t y)
 
 #define NUMCOLORMAPS 32
 
+#if defined PEBBLE_EMERY
+// Pebble colours are 6-bit, so each COLORMAP level holds 64 entries
+// (tools/build_wad.py builds 32 levels, 2 KB instead of 8 KB).
+#define COLORMAP_STRIDE 64
+#else
+#define COLORMAP_STRIDE 256
+#endif
+
 
 const uint8_t* R_LoadColorMap(int16_t lightlevel)
 {
-    return fullcolormap; // Bright watch palette; one 256-byte map.
+    if (fixedcolormap)
+        return fixedcolormap;
+    else
+    {
+        if (curline)
+        {
+            if (curline->v1.y == curline->v2.y)
+                lightlevel -= 1 << LIGHTSEGSHIFT;
+            else if (curline->v1.x == curline->v2.x)
+                lightlevel += 1 << LIGHTSEGSHIFT;
+        }
 
+        lightlevel += (extralight +_g_gamma) << LIGHTSEGSHIFT;
+
+        int16_t cm = ((256-lightlevel)>>2) - 24;
+
+        if(cm >= NUMCOLORMAPS)
+            cm = NUMCOLORMAPS-1;
+        else if(cm < 0)
+            cm = 0;
+
+        return fullcolormap + cm*COLORMAP_STRIDE;
+    }
 }
 
 

@@ -41,7 +41,7 @@ def build():
     m.door(-272, 672, -256, 736, axis='x', floor=16)
     dais = [(-560, 672), (-560, 736), (-464, 736), (-464, 672)]
     m.sector([(-592, 576), (-592, 832), (-272, 832), (-272, 576)], floor=16, ceil=144,
-             floor_col=RUST, ceil_col=GREY, light=160, wall='GRAY', holes=[dais])
+             floor_col=RUST, ceil_col=GREY, light=96, special=8, wall='GRAY', holes=[dais])
     m.sector(dais, floor=24, ceil=144, floor_col=TEAL, ceil_col=GREY, light=192, wall='STEP')
 
     # Yellow door east into the control room.
@@ -50,7 +50,7 @@ def build():
                [(720, 752), (720, 784), (752, 784), (752, 752)]]
     m.sector([(592, 576), (592, 832), (912, 832), (912, 736), (928, 736), (928, 672),
               (912, 672), (912, 576)], floor=16, ceil=160, floor_col=DARK, ceil_col=GREY,
-             light=176, wall='COMP', holes=pillars)
+             light=136, wall='COMP', holes=pillars)
     for p in pillars:
         for a, b in zip(p, p[1:] + p[:1]):
             m.edge(a, b, mid='SUPPORT')

@@ -28,6 +28,9 @@ static uint32_t s_touch_at, s_last_tap, s_last_tick, s_accumulator;
 static unsigned s_frames;
 static uint32_t s_max_draw_ms, s_max_tick_ms, s_max_gap_ms;
 static unsigned s_hits, s_clock_skips;
+// Engine hint/pickup message ("You need a blue key...") shown for 2 s.
+static const char *s_message;
+static uint32_t s_message_until;
 static gamestate_t s_last_state=GS_DEMOSCREEN;  // logged on change, e.g. "state 1 map 1" = level cleared
 static uint32_t now_ms(void) {
     time_t sec; uint16_t ms; time_ms(&sec,&ms);
@@ -255,13 +258,29 @@ static void canvas_update_proc(Layer *layer,GContext *ctx) {
     graphics_draw_text(ctx,"HP",label,GRect(18,190,40,16),GTextOverflowModeTrailingEllipsis,GTextAlignmentLeft,NULL);
     graphics_draw_text(ctx,"AMMO",label,GRect(85,190,50,16),GTextOverflowModeTrailingEllipsis,GTextAlignmentLeft,NULL);
     graphics_draw_text(ctx,"ARM",label,GRect(150,190,45,16),GTextOverflowModeTrailingEllipsis,GTextAlignmentLeft,NULL);
+    if(s_message && _g_gamestate==GS_LEVEL) {
+        if((int32_t)(now_ms()-s_message_until)<0) {
+            GRect box=GRect(4,2,192,34);
+            GSize size=graphics_text_layout_get_content_size(s_message,label,box,GTextOverflowModeWordWrap,GTextAlignmentCenter);
+            graphics_context_set_fill_color(ctx,GColorBlack);
+            graphics_fill_rect(ctx,GRect(0,0,200,size.h+6),0,GCornerNone);
+            graphics_draw_text(ctx,s_message,label,box,GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
+        } else s_message=NULL;
+    }
     if(_g_gamestate!=GS_LEVEL || _g_player.playerstate==PST_DEAD) {
         graphics_context_set_fill_color(ctx,GColorBlack);
         graphics_fill_rect(ctx,GRect(10,40,180,105),0,GCornerNone);
         const char *title,*hint;
+        static char stats[64];
         if(_g_gamestate==GS_LEVEL) { title="YOU DIED"; hint="Select: retry level\nDouble Back: menu"; }
-        else if(next_map_exists()) { title="LEVEL CLEAR"; hint="Select: next level\nDouble Back: menu"; }
-        else { title="YOU WIN"; hint="Select: play again\nDouble Back: menu"; }
+        else {
+            bool more=next_map_exists();
+            title=more ? "LEVEL CLEAR" : "YOU WIN";
+            snprintf(stats,sizeof(stats),"Kills %d/%d  Time %d:%02d\n%s",(int)_g_wminfo.plyr[0].skills,
+                (int)_g_wminfo.maxkills,(int)(_g_wminfo.plyr[0].stime/TICRATE/60),(int)(_g_wminfo.plyr[0].stime/TICRATE%60),
+                more ? "Select: next level" : "Select: play again");
+            hint=stats;
+        }
         graphics_draw_text(ctx,title,fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),GRect(10,44,180,30),GTextOverflowModeTrailingEllipsis,GTextAlignmentCenter,NULL);
         graphics_draw_text(ctx,hint,label,GRect(16,80,168,56),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
     }
@@ -322,6 +341,10 @@ static void frame_timer_callback(void *data) {
             }
 #endif
             G_BuildTiccmd(); G_Ticker(); ++_g_gametic;
+            if(_g_player.message) {
+                s_message=_g_player.message; s_message_until=now_ms()+2000;
+                _g_player.message=NULL;
+            }
             if(_g_gamestate!=s_last_state) {
                 s_last_state=_g_gamestate;
                 APP_LOG(APP_LOG_LEVEL_INFO,"state %d map %d zone%lu",_g_gamestate,_g_gamemap,

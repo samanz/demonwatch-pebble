@@ -26,6 +26,10 @@ int main(void) {
     dc.x=60; dc.yl=80; dc.yh=113; dc.source=source; dc.fracstep=512;
     R_DrawColumnSprite(&dc);
     assert(fb[140*STRIDE+100]==0xff);
+    uint8_t light[64]; for(int i=0;i<64;++i) light[i]=i==63 ? 21 : i;
+    dc.colormap=light; R_DrawColumnSprite(&dc);
+    assert(fb[140*STRIDE+100]==(0xc0|21));   // sector light table applied
+    dc.colormap=NULL;
     _g_player.health=82; _g_player.ammo[0]=24; _g_player.armorpoints=7;
     ST_PebbleDrawer(fb);
     for(int y=190;y<228;++y)
@@ -38,5 +42,5 @@ int main(void) {
     assert(I_GetPebbleFramebuffer()==NULL);
     I_SetPebbleFramebuffer(fb,100,100);
     assert(I_GetPebbleFramebuffer()==NULL);
-    puts("PASS: viewport coverage, clipping, sprite pixels, padded stride, framebuffer guards");
+    puts("PASS: viewport coverage, clipping, sprite pixels, light table, padded stride, framebuffer guards");
 }

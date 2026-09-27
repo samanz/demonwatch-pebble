@@ -59,9 +59,13 @@ void R_FreeSkyPatch(void)
 }
 
 
+#if !defined SKY_COLOR
+#define SKY_COLOR 1
+#endif
+
 void R_DrawSky(draw_column_vars_t *dcvars)
 {
-	R_DrawColumnFlat(1, dcvars);
+	R_DrawColumnFlat(SKY_COLOR, dcvars);
 }
 
 #else

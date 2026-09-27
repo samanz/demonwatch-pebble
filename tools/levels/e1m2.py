@@ -25,7 +25,7 @@ def build():
     m.door(352, 384, 416, 400, axis='y')
 
     # Hall, split by a nukage channel with a bridge.
-    hall = dict(ceil=160, floor_col=BROWNF, ceil_col=DARK, light=176, wall='BROWN')
+    hall = dict(ceil=160, floor_col=BROWNF, ceil_col=DARK, light=144, wall='BROWN')
     m.rect(0, 400, 768, 608, floor=0, **hall)
     m.rect(0, 704, 768, 912, floor=0, **hall)
     m.rect(352, 608, 416, 704, floor=0, ceil=160, floor_col=GREY, ceil_col=DARK, light=176, wall='METAL')
@@ -35,8 +35,8 @@ def build():
 
     # Storage room west of the hall, with a lift up to the key ledge.
     m.sector([(-256, 704), (-256, 768), (-192, 768), (-192, 848), (-256, 848), (-256, 912),
-              (0, 912), (0, 704)], floor=0, ceil=192, floor_col=RUST, ceil_col=GREY, light=144,
-             wall='COMP')
+              (0, 912), (0, 704)], floor=0, ceil=192, floor_col=RUST, ceil_col=GREY, light=112,
+             special=1, wall='COMP')
     m.rect(-256, 768, -192, 848, floor=96, ceil=192, floor_col=GREY, ceil_col=GREY, light=144,
            tag=LIFT_TAG, wall='METAL')
     for a, b in (((-256, 768), (-192, 768)), ((-192, 768), (-192, 848)), ((-192, 848), (-256, 848)),
@@ -49,7 +49,7 @@ def build():
 
     # Computer room: lower floor with two pillars, stairs up to a raised back.
     m.sector([(192, 928), (192, 1120), (576, 1120), (576, 928)], floor=0, ceil=160,
-             floor_col=DARK, ceil_col=GREY, light=176, wall='COMP',
+             floor_col=DARK, ceil_col=GREY, light=128, wall='COMP',
              holes=[[(256, 992), (256, 1024), (288, 1024), (288, 992)],
                     [(480, 992), (480, 1024), (512, 1024), (512, 992)]])
     for pillar in (((256, 992), (256, 1024), (288, 1024), (288, 992)),

@@ -1,6 +1,7 @@
 """Quick emulator look at a map: install, start a new game, take screenshots
-while turning in place and walking a little, then report engine errors and
-the zone/heap figures from the log.
+while turning (by tilting the simulated watch), walk forward, press use (opens
+a door ahead) and look through, then report engine errors and the zone/heap
+figures from the log. The emulator presses one button at a time.
 
 Usage: python3 tools/smoke_map.py [build/pdoom.pbw] [name-prefix]
 Screenshots go to work/<prefix>-*.png.
@@ -38,18 +39,22 @@ with LOG.open('w') as f:
         btn('click', 'select')          # New game
         time.sleep(1.5)
         snap('start')
-        for i in range(3):              # look around: fire + down turns right
-            btn('push', 'select')
-            btn('--duration', '350', 'click', 'down')
-            btn('release', 'select')
-            time.sleep(0.4)
-            snap(f'turn{i}')
-        btn('push', 'select')
-        btn('--duration', '350', 'click', 'down')
-        btn('release', 'select')
         btn('--duration', '2500', 'click', 'up')
         time.sleep(0.5)
         snap('walk')
+        btn('click', 'back')            # use: open the door ahead, if any
+        time.sleep(1.5)
+        snap('use')
+        btn('--duration', '1200', 'click', 'up')
+        time.sleep(0.3)
+        snap('through')
+        # Emulator tilt motions leave a net turn, so look around last.
+        for i, motion in enumerate(('tilt-left', 'tilt-right')):
+            run('emu-accel', '--emulator', 'emery', motion)
+            time.sleep(0.6)
+            run('emu-accel', '--emulator', 'emery', 'gravity-z')
+            time.sleep(0.3)
+            snap(f'turn{i}')
         time.sleep(3.5)
     finally:
         log.terminate()
