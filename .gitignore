@@ -1,0 +1,21 @@
+# Build output
+build/
+.lock-waf*
+*.o
+*.elf
+*.bin
+*.map
+*.pbw
+
+# Python
+__pycache__/
+*.pyc
+
+# Scratch area: screenshots, logs, test binaries, Freedoom zip, old snapshots
+work/
+
+# Stray screenshots in the project root
+/*.png
+
+# Backups
+*.bak

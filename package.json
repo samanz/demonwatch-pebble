@@ -1,0 +1,38 @@
+{
+  "name": "pdoom",
+  "author": "pDOOM Project",
+  "version": "0.2.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "pDOOM",
+    "uuid": "d00364e1-0e11-4000-8000-000000000001",
+    "sdkVersion": "3",
+    "enableMultiJS": false,
+    "targetPlatforms": [
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [],
+    "resources": {
+      "media": [
+        {
+          "type": "raw",
+          "name": "E1M1_WAD",
+          "file": "arena.pbl"
+        },
+        {
+          "type": "bitmap",
+          "name": "MENU_ICON",
+          "file": "menu_icon.png",
+          "menuIcon": true
+        }
+      ]
+    }
+  }
+}

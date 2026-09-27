@@ -1,0 +1,30 @@
+{
+  "uuid": "d00364e1-0e11-4000-8000-000000000001",
+  "shortName": "pDOOM",
+  "longName": "pDOOM: E1M1",
+  "companyName": "pDOOM Project",
+  "versionLabel": "1.0.0",
+  "sdkVersion": "3",
+  "targetPlatforms": [
+    "flint",
+    "emery",
+    "diorite",
+    "chalk",
+    "basalt",
+    "aplite",
+    "gabbro"
+  ],
+  "watchapp": {
+    "watchface": false
+  },
+  "appKeys": {},
+  "resources": {
+    "media": [
+      {
+        "type": "raw",
+        "name": "RESOURCE_ID_E1M1_WAD",
+        "file": "resources/e1m1.pbl"
+      }
+    ]
+  }
+}
