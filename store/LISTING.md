@@ -40,7 +40,7 @@ authors; source code is provided with the app). Art and sounds from Freedoom
 - Platform: Emery (Pebble Time 2)
 - Screenshots: `dist/<version>/screenshots/` (200 x 228), made by
   `tools/package_release.py` from the emulator run
-- Icon: `resources/menu_icon.png`
+- Icons: `store/icon-48.png` and `store/icon-144.png` (store), `resources/menu_icon.png` (25 x 25 launcher); all drawn by `tools/build_icon.py`. The launcher shows the icon in greyscale, so the face uses bright red to stay light against its outline.
 
 ## Before submitting
 

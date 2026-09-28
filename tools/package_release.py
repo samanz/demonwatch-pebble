@@ -47,6 +47,8 @@ for src, dst in SCREENSHOTS.items():
         shutil.copyfile(ROOT / src, shots / dst)
     else:
         print(f'missing screenshot {src} (run tools/check_maps.py)')
+for icon in ('icon-48.png', 'icon-144.png'):   # store icons (tools/build_icon.py)
+    shutil.copyfile(ROOT / 'store' / icon, out / icon)
 sums = ''.join(f'{hashlib.sha256((out / n).read_bytes()).hexdigest()}  {n}\n'
                for n in (f'{name}.pbw', f'{name}-source.zip'))
 (out / 'SHA256SUMS.txt').write_text(sums)
