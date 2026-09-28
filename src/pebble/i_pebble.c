@@ -223,7 +223,7 @@ static void draw_menu(GContext *ctx) {
     graphics_context_set_fill_color(ctx,GColorBlack);
     graphics_fill_rect(ctx,GRect(0,0,200,228),0,GCornerNone);
     graphics_context_set_text_color(ctx,GColorWhite);
-    static const char *const titles[]={"pDOOM","","PAUSED","SETTINGS","CONTROLS","DIFFICULTY","ERROR","ABOUT"};
+    static const char *const titles[]={"DEMONWATCH","","PAUSED","SETTINGS","CONTROLS","DIFFICULTY","ERROR","ABOUT"};
     text(ctx,titles[s_page],12,FONT_KEY_GOTHIC_28_BOLD);
     if(s_page==HELP) {
         const char *lines[]={"Up / Down: move","Select: fire","Tilt / drag: turn","Tap: open / fire","Hold screen: weapon","Back: use door","Double Back: pause"};
@@ -240,7 +240,7 @@ static void draw_menu(GContext *ctx) {
             fonts_get_system_font(FONT_KEY_GOTHIC_14),GRect(8,46,184,160),
             GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
     } else if(s_page==FATAL) {
-        graphics_draw_text(ctx,"pDOOM hit an error and stopped.",fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+        graphics_draw_text(ctx,"Demonwatch hit an error and stopped.",fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
             GRect(10,50,180,50),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);
         graphics_draw_text(ctx,s_fatal_message ? s_fatal_message : "",fonts_get_system_font(FONT_KEY_GOTHIC_14),
             GRect(10,104,180,90),GTextOverflowModeWordWrap,GTextAlignmentCenter,NULL);

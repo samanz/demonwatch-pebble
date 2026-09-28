@@ -119,6 +119,7 @@ with LOG.open('w') as f:
     try:
         time.sleep(2)
         has_continue = launch()
+        snap('title')
         if has_continue:
             btn('click', 'down')            # skip Continue: start fresh
         btn('click', 'select')              # New game -> difficulty page

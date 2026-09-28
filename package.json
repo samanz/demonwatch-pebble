@@ -1,6 +1,6 @@
 {
   "name": "pdoom",
-  "author": "pDOOM Project",
+  "author": "Demonwatch",
   "version": "0.3.0",
   "keywords": [
     "pebble-app"
@@ -8,7 +8,7 @@
   "private": true,
   "dependencies": {},
   "pebble": {
-    "displayName": "pDOOM",
+    "displayName": "Demonwatch",
     "uuid": "d00364e1-0e11-4000-8000-000000000001",
     "sdkVersion": "3",
     "enableMultiJS": false,

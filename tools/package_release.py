@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCREENSHOTS = {   # emulator captures from tools/check_maps.py -> store names
+    'work/title.png': '0-title.png',
     'work/difficulty.png': '1-difficulty.png',
     'work/map1-look0.png': '2-hangar-gate.png',
     'work/map2-start.png': '3-toxin-refinery.png',
@@ -32,7 +33,7 @@ def git(*args):
 if git('status', '--porcelain', '--untracked-files=no').strip():
     sys.exit('Commit your changes first: the source zip must match the app.')
 version = json.loads((ROOT / 'package.json').read_text())['version']
-name = f'pdoom-{version}'
+name = f'demonwatch-{version}'
 out = ROOT / 'dist' / version
 out.mkdir(parents=True, exist_ok=True)
 

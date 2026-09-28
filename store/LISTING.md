@@ -2,15 +2,9 @@
 
 ## Name
 
-"DOOM" is a trademark of id Software / ZeniMax, and "pDOOM" puts it front and
-centre, so a store may reject or later remove the listing. Pick a name that
-does not contain "Doom"; the in-app name lives in `package.json`
-(`displayName`, `shortName`) and the title text in `src/pebble/i_pebble.c`
-(`titles[]`). Options:
-
-- **Demonwatch** – short, says what it is, nothing to confuse with id's games.
-- **Wrist Inferno** – descriptive, a little playful.
-- **Gatecrash** – ties in with the first level (Hangar Gate).
+**Demonwatch** (launcher and store). Chosen instead of the development name
+"pDOOM" because "DOOM" is a trademark of id Software / ZeniMax. Before
+submitting, search the store and a trademark database for existing uses.
 
 It is fine to say in the description that the game runs a port of the
 Doom64KB engine and uses Freedoom art (that is attribution, not branding).
@@ -50,9 +44,8 @@ authors; source code is provided with the app). Art and sounds from Freedoom
 
 ## Before submitting
 
-1. Choose the name and update `package.json` and `titles[]`.
-2. Play all three levels on the watch on Easy, Normal and Hard.
-3. `sh tools/check_all.sh --emulator`, commit, then
+1. Play all three levels on the watch on Easy, Normal and Hard.
+2. `sh tools/check_all.sh --emulator`, commit, then
    `python3 tools/package_release.py`.
-4. Publish the source zip (or the git repository) somewhere public and link
+3. Publish the source zip (or the git repository) somewhere public and link
    it from the listing: the GPL requires the source to be available.
