@@ -2,6 +2,8 @@
 
 (Development name: pDOOM. The repository, package name and internal identifiers still use `pdoom`; the app keeps the same UUID, so it installs over earlier builds with saves intact.)
 
+Source: https://github.com/samanz/demonwatch-pebble
+
 Native Doom64KB-derived game for Pebble Time 2 (Emery), built with Pebble SDK 4.33.1. It contains a three-map episode of original Doom-style levels (E1M1 Hangar Gate, E1M2 Toxin Refinery, E1M3 Command Center) with doors, key doors, a lift, stairs, nukage, windows and outdoor areas; zombiemen, shotgun guys, imps and demons; and the fist, pistol, shotgun and chaingun. Art is adapted from Freedoom 0.13.0. No commercial Doom WAD is required or bundled.
 
 ## Install and play

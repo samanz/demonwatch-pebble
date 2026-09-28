@@ -31,7 +31,7 @@ steers, tap the screen to use or fire, touch-and-hold changes weapon, Back
 opens doors, double Back pauses.
 
 Credits: engine is a port of Doom64KB (GPL-2.0, id Software and the Doom64KB
-authors; source code is provided with the app). Art and sounds from Freedoom
+authors; source code: https://github.com/samanz/demonwatch-pebble). Art and sounds from Freedoom
 (BSD licence). Levels are original (CC0).
 
 ## Store fields
@@ -47,5 +47,5 @@ authors; source code is provided with the app). Art and sounds from Freedoom
 1. Play all three levels on the watch on Easy, Normal and Hard.
 2. `sh tools/check_all.sh --emulator`, commit, then
    `python3 tools/package_release.py`.
-3. Publish the source zip (or the git repository) somewhere public and link
-   it from the listing: the GPL requires the source to be available.
+3. Push the release commit to https://github.com/samanz/demonwatch-pebble (the
+   public source the GPL requires) and link it from the listing.

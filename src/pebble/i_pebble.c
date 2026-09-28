@@ -233,8 +233,9 @@ static void draw_menu(GContext *ctx) {
             "Version " PDOOM_VERSION "\n"
             "Doom64KB engine for Pebble.\n"
             "Engine: GPL-2.0, id Software and\n"
-            "Doom64KB authors. Source is\n"
-            "available with this app.\n"
+            "Doom64KB authors. Source:\n"
+            "github.com/samanz/\n"
+            "demonwatch-pebble\n"
             "Art: Freedoom (BSD licence).\n"
             "Levels: CC0.",
             fonts_get_system_font(FONT_KEY_GOTHIC_14),GRect(8,46,184,160),
