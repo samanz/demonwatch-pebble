@@ -17,7 +17,7 @@ from convert_map import MapError, build as build_map
 from doommap import check
 
 OUTPUT = ROOT / 'resources/pdoom.pbl'
-MAPS = ['e1m1', 'e1m2', 'e1m3']
+MAPS = ['e1m1', 'e1m2', 'e1m3', 'e1m4']
 RESOURCE_LIMIT = 262144 - 4096   # Emery resource budget, minus headroom
 # Per-level zone budget for convert_map's estimate. Measured in the emulator:
 # with the 28 KB zone ~22.8 KB is free when a new game starts (4 KB of static

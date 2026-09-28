@@ -4,7 +4,7 @@
 
 Source: https://github.com/samanz/demonwatch-pebble
 
-Native Doom64KB-derived game for Pebble Time 2 (Emery), built with Pebble SDK 4.33.1. It contains a three-map episode of original Doom-style levels (E1M1 Hangar Gate, E1M2 Toxin Refinery, E1M3 Command Center) with doors, key doors, a lift, stairs, nukage, windows and outdoor areas; zombiemen, shotgun guys, imps and demons; and the fist, pistol, shotgun and chaingun. Art is adapted from Freedoom 0.13.0. No commercial Doom WAD is required or bundled.
+Native Doom64KB-derived game for Pebble Time 2 (emery) and Pebble Round 2 (gabbro), built with Pebble SDK 4.33.1. It contains a four-map episode of original Doom-style levels (E1M1 Hangar Gate, E1M2 Toxin Refinery, E1M3 Command Center, and the E1M4 Reactor Core finale against the Baron of Hell) with doors, key doors, a lift, stairs, nukage, windows and outdoor areas; zombiemen, shotgun guys, imps, demons and the Baron of Hell; and the fist, pistol, shotgun and chaingun. Art is adapted from Freedoom 0.13.0. No commercial Doom WAD is required or bundled.
 
 ## Install and play
 
@@ -29,7 +29,7 @@ Install `pdoom-alpha.pbw` using a Pebble app installation workflow supporting Em
 - After death: Select retries the current level.
 - After the exit switch: Select continues to the next map (E1M2, E1M3, … when present, keeping inventory). After the last map, Select starts a new game.
 
-Each level announces its name on entry and has one secret (a door disguised as wall, with a stash behind it); the level-end screen shows kills, secrets found and time, and the last map ends with an episode-clear screen. Doors open with Back and close again after a few seconds. Key doors (blue, yellow stripes beside the door) need the matching keycard. A lift is used by pressing Back at its side. Each map ends at an exit switch.
+Each level announces its name on entry and has one secret (a door disguised as wall, with a stash behind it); the level-end screen shows kills, secrets found, time and your best time for the map ("NEW BEST" when beaten), and the last map ends with an episode-clear screen. Doors open with Back and close again after a few seconds. Key doors (blue, yellow stripes beside the door) need the matching keycard. A lift is used by pressing Back at its side. Each map ends at an exit switch.
 
 ## Verified scope and limits
 
@@ -37,7 +37,7 @@ The Emery emulator was used to exercise movement, pickup, door use, killing enem
 
 The renderer uses 120 x 114 logical pixels scaled to a 200 x 190 view, plus a health/ammo/armor HUD with keycard squares (blue, yellow, red) at the right edge. Engine hint and pickup messages ("You need a blue key...", "Picked up a shotgun.") appear at the top for 2 seconds; the level-end screen shows kills and time. Sector lighting follows Doom64KB: each sector's light level picks one of 32 64-entry light tables (lights of 160 and above are full bright, 128 dim, 96 dark), horizontal and vertical walls get Doom's fake contrast, gun flashes brighten, and flicker/strobe/glow sector specials animate. Floors and ceilings are solid colours; the sky is a flat blue-grey. Freedoom art is converted with a mild colour boost and a 2x2 ordered dither so greys and browns keep their shading on the 64-colour display. Engine simulation runs at 35 ticks per second. Physical Emery hardware running PebbleOS 4.38.2 has now launched successfully and logged movement. Extended gameplay, battery use, and touch feel still need hardware testing. There is no sound, save system, full E1M1, or arbitrary WAD support. This is a playable prototype, not an App Store release.
 
-SDK measurements: resources 244,457 bytes (of 256 KB); initial available heap 67,197 bytes, about 9 KB free during play. The loaded image (63,876 bytes) must fit the SDK header's 65,535-byte field, leaving only about 1.6 KB of code/static-data headroom: new features need matching savings first.
+SDK measurements: resources 249,663 bytes (of 256 KB); about 9 KB of heap free during play. The loaded image (62,972 bytes on the Time 2, 63,096 on the Round 2) must fit the SDK header's 65,535-byte field, leaving about 2.4 KB of code/static-data headroom: new features need matching savings first. Space already recovered: the Pebble switch list holds only the exit switch, the stair-builder special is compiled out, and the sprite clip arrays and the 16-bit tantoangle table live on the heap.
 
 Space-saving conventions (keep them when adding content):
 - `states[]` stores each action as an 8-bit index into `actionfuncs[]` and is packed to 8 bytes per state. Its fields must stay in the same order as the positional initializers in `info.c`; `tests/test_info.c` checks every index is in range.
@@ -46,6 +46,14 @@ Space-saving conventions (keep them when adding content):
 - Scratch tables needed only at startup (such as the sprite-frame table) are heap-allocated and freed.
 
 Memory: the Doom zone is 28 KB (falling back to 24/20/18 KB if the heap is short), leaving about 7 KB of PebbleOS heap during play. About 6 KB of the zone holds permanent data (sprite frame tables store only the front view; TEXTURE1 carries names only; 2 KB of light tables), leaving about 22.8 KB per level; the tightest map keeps at least 7.5 KB free. The game draws at 30 frames per second (the simulation stays at 35 tics per second) to save battery. Map lumps (THINGS through BLOCKMAP after each `E1Mx` marker) are released on every level load. Global lumps stay resident; sprite and wall patches stream through one scratch buffer. The app log reports free zone memory (`zone`) every 105 tics and on every game-state change.
+
+## Round 2
+
+On the Round 2 the same 200 x 228 layout is centred on the 260 x 260 round screen (the canvas layer is offset, so menus and text move with it); the renderer writes through a per-row table built from `gbitmap_get_data_row_info`, because round framebuffers store each row at its own address and width. The corners of the layout fall outside the circle.
+
+## Boss finale
+
+E1M4 ends with the Baron of Hell (two on Hard). Its states are remapped onto 8 Freedoom frames (`tools/assets.py` `SPRITE_DONORS`) and its fireball uses the imp's sprite, to fit the resource budget. On the Pebble, `A_BossDeath` works on any map: when every Baron is dead, sectors tagged 666 lower; E1M4's exit passage is sealed by one.
 
 ## Making levels
 

@@ -215,6 +215,7 @@ class Map:
 DOOR_SPECIALS = {1: None, 31: None, 26: 'blue', 32: 'blue', 27: 'yellow', 34: 'yellow', 28: 'red', 33: 'red'}
 LIFT_SPECIALS = {62, 88, 10, 21, 120, 121, 123}
 EXIT_SPECIALS = {11, 51, 52}
+BOSS_TAG = 666   # sectors with this tag lower to their lowest neighbour when all Barons die
 KEY_THINGS = {5: 'blue', 40: 'blue', 6: 'yellow', 39: 'yellow', 13: 'red', 38: 'red'}
 # Thing radius by doomednum; anything else is treated as a 20-unit item.
 RADIUS = {1: 16, 3004: 20, 9: 20, 3001: 20, 3002: 30, 58: 30, 3003: 24, 2035: 10}
@@ -247,6 +248,7 @@ def check(m):
 
     # Sector graph for the route check.
     lifts = {props.get('tag') for props in m.overrides.values() if props.get('special') in LIFT_SPECIALS}
+    lifts.add(BOSS_TAG)   # lowered by A_BossDeath when every Baron is dead
     links = {s.index: [] for s in m.sectors}
     exits = set()
     for e in edges:

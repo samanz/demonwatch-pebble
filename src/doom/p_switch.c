@@ -46,7 +46,13 @@
 #include "globdata.h"
 
 
+#if defined PEBBLE_EMERY
+// Only the switch textures the Pebble levels use; tools/assets.py (via
+// texture_names) packs exactly the SW1/SW2 names listed here.
+#define MAXSWITCHES		1
+#else
 #define MAXSWITCHES		19
+#endif
 
 static int16_t switchlist[(MAXSWITCHES + 1) * 2];
 static int16_t   numswitches;
@@ -66,6 +72,9 @@ typedef char assertSwitchlistSize[sizeof(switchlist_t) == 18 ? 1 : -1];
 
 static const switchlist_t alphSwitchList[MAXSWITCHES] =
 {
+#if defined PEBBLE_EMERY
+    {"SW1EXIT",  "SW2EXIT" },
+#else
     // Doom episode 1 switches
     {"SW1BRCOM", "SW2BRCOM"},
     {"SW1BRN1",  "SW2BRN1" },
@@ -86,6 +95,7 @@ static const switchlist_t alphSwitchList[MAXSWITCHES] =
     {"SW1STON2", "SW2STON2"},
     {"SW1STONE", "SW2STONE"},
     {"SW1STRTN", "SW2STRTN"}
+#endif
 };
 
 
@@ -457,11 +467,13 @@ boolean P_UseSpecialLine(mobj_t __far* thing, const line_t __far* line)
       break;
 
     // Switches (non-retriggerable)
+#if !defined PEBBLE_EMERY   // Pebble levels build stairs as static sectors
     case 7:
       // Build Stairs
       if (EV_BuildStairs(line))
         P_ChangeSwitchTexture(line,false);
       break;
+#endif
 
     case 9:
       // Change Donut

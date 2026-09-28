@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # mobj, which R_ProjectSprite culls before touching its (missing) frames.
 SPRITES = (
     'PUNG PISG PISF SHTG SHTF CHGG CHGF '          # weapons
-    'POSS SPOS TROO SARG '                         # monsters
+    'POSS SPOS TROO SARG BOSS '                    # monsters (BOSS: E1M4 finale)
     'BLUD PUFF BAL1 POL5 '                         # effects, crushed corpse
     'CLIP AMMO SHEL SBOX MGUN SHOT '               # ammo and weapons
     'STIM MEDI BON1 BON2 ARM1 ARM2 '               # health and armour
@@ -45,9 +45,6 @@ PATCHES = {
     'PNUKE':   ('NUKE24', 64, None),
     'PSTEP':   ('STEP6', 32, None),
     'PSWEX1':  ('STARTAN3', 64, ('SW1EXIT', 16, 28)),
-    'PSWEX2':  ('STARTAN3', 64, ('SW2EXIT', 16, 28)),
-    'PSWCM1':  ('SW1COMP', 64, None),
-    'PSWCM2':  ('SW2COMP', 64, None),
 }
 
 # Map texture name -> patch lump. Texture 0 is reserved for "no texture".
@@ -60,7 +57,13 @@ TEXTURES = {
     # Required by the engine at startup (r_sky.c, p_spec.c); never drawn.
     'SKY1': 'PWALL', 'SLADRIP1': 'PWALL', 'SLADRIP2': 'PWALL', 'SLADRIP3': 'PWALL',
 }
-SWITCH_PATCHES = {'SW1EXIT': 'PSWEX1', 'SW2EXIT': 'PSWEX2', 'SW1COMP': 'PSWCM1', 'SW2COMP': 'PSWCM2'}
+# The pressed exit switch reuses the unpressed art (the level ends at once).
+SWITCH_PATCHES = {'SW1EXIT': 'PSWEX1', 'SW2EXIT': 'PSWEX1'}
+
+# Sprites whose engine frames are a subset of the Freedoom frames: engine
+# frame k uses the Freedoom frame letter at position k (see the BOSS states in
+# src/doom/info.c, remapped to 8 frames to fit the resource budget).
+SPRITE_DONORS = {'BOSS': 'ABEGHIKO'}
 
 # Sound effects: Freedoom lump -> longest kept length in seconds. Converted to
 # 8 kHz signed 8-bit PCM (the speaker's stream format), trailing silence
@@ -75,7 +78,11 @@ SOUNDS = {
 def texture_names():
     """All texture names in index order: design textures, then every switch
     texture the engine's switch list requires."""
-    switches = re.findall(r'"(SW[12][A-Z0-9]+)"', (ROOT / 'src/doom/p_switch.c').read_text())
+    # The Pebble switch list is the PEBBLE_EMERY block of alphSwitchList.
+    source = (ROOT / 'src/doom/p_switch.c').read_text()
+    block = source[source.index('alphSwitchList[MAXSWITCHES]'):]
+    block = block[block.index('#if defined PEBBLE_EMERY'):block.index('#else')]
+    switches = re.findall(r'"(SW[12][A-Z0-9]+)"', block)
     names = list(TEXTURES) + [s for s in switches if s not in TEXTURES]
     return names
 

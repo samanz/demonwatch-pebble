@@ -3,9 +3,10 @@ while turning (by tilting the simulated watch), walk forward, press use (opens
 a door ahead) and look through, then report engine errors and the zone/heap
 figures from the log. The emulator presses one button at a time.
 
-Usage: python3 tools/smoke_map.py [build/pdoom.pbw] [name-prefix]
+Usage: [EMULATOR=gabbro] python3 tools/smoke_map.py [build/pdoom.pbw] [name-prefix]
 Screenshots go to work/<prefix>-*.png.
 """
+import os
 import re
 import subprocess
 import sys
@@ -13,6 +14,7 @@ import time
 from pathlib import Path
 
 cmd = [sys.executable, '-u', 'tools/run_pebble.py']
+EMU = os.environ.get('EMULATOR', 'emery')   # or gabbro (Round 2)
 pbw = sys.argv[1] if len(sys.argv) > 1 else 'build/pdoom.pbw'
 prefix = sys.argv[2] if len(sys.argv) > 2 else 'smoke'
 LOG = Path('work/smoke.log')
@@ -23,19 +25,19 @@ def run(*args):
 
 
 def btn(*args):
-    run('emu-button', '--emulator', 'emery', *args)
+    run('emu-button', '--emulator', EMU, *args)
 
 
 def snap(name):
-    run('screenshot', '--emulator', 'emery', '--no-open', f'work/{prefix}-{name}.png')
+    run('screenshot', '--emulator', EMU, '--no-open', f'work/{prefix}-{name}.png')
 
 
-run('emu-accel', '--emulator', 'emery', 'gravity-z')
+run('emu-accel', '--emulator', EMU, 'gravity-z')
 with LOG.open('w') as f:
-    log = subprocess.Popen(cmd + ['logs', '--emulator', 'emery'], stdout=f, stderr=f)
+    log = subprocess.Popen(cmd + ['logs', '--emulator', EMU], stdout=f, stderr=f)
     try:
         time.sleep(2)
-        run('install', '--emulator', 'emery', pbw)
+        run('install', '--emulator', EMU, pbw)
         for _ in range(30):             # the title logs whether Continue is offered
             m = re.search(r'title: continue (\d)', LOG.read_text(errors='replace'))
             if m:
@@ -59,9 +61,9 @@ with LOG.open('w') as f:
         snap('through')
         # Emulator tilt motions leave a net turn, so look around last.
         for i, motion in enumerate(('tilt-left', 'tilt-right')):
-            run('emu-accel', '--emulator', 'emery', motion)
+            run('emu-accel', '--emulator', EMU, motion)
             time.sleep(0.6)
-            run('emu-accel', '--emulator', 'emery', 'gravity-z')
+            run('emu-accel', '--emulator', EMU, 'gravity-z')
             time.sleep(0.3)
             snap(f'turn{i}')
         time.sleep(3.5)

@@ -580,11 +580,13 @@ static void P_CrossSpecialLine(const line_t __far* line, int16_t side, mobj_t __
         LN_SPECIAL(line) = 0;
       break;
 
+#if !defined PEBBLE_EMERY   // Pebble levels build stairs as static sectors
     case 8:
       // Build Stairs
       if (EV_BuildStairs(line))
         LN_SPECIAL(line) = 0;
       break;
+#endif
 
     case 16:
       // Close Door 30

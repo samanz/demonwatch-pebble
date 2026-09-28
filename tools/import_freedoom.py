@@ -19,7 +19,7 @@ import struct as st
 import sys
 import zipfile
 
-from assets import PATCHES, ROOT, SOUNDS, WEAPON_SPRITES, patch, read_lumps, sprite_frames
+from assets import PATCHES, ROOT, SOUNDS, SPRITE_DONORS, WEAPON_SPRITES, patch, read_lumps, sprite_frames
 
 
 def convert_sound(data, max_seconds, rate_out=8000):
@@ -110,12 +110,16 @@ def main(path):
     art = []
 
     for name in sprite_frames():
-        donor = next((n for n in (name, name[:5] + '1') if n in wad), None)
+        # Engine frame letter -> Freedoom frame letter (e.g. the Baron's 8 frames).
+        want = name
+        if name[:4] in SPRITE_DONORS:
+            want = name[:4] + SPRITE_DONORS[name[:4]][ord(name[4]) - 65] + name[5:]
+        donor = next((n for n in (want, want[:5] + '1') if n in wad), None)
         if donor is None:
-            donor = next((n for n in wad if n.startswith(name[:5]) and n[5:6] in ('0', '1')), None)
+            donor = next((n for n in wad if n.startswith(want[:5]) and n[5:6] in ('0', '1')), None)
         if donor is None:
-            candidates = [n for n in wad if n.startswith(name[:4]) and len(n) >= 6
-                          and n[5] in ('0', '1') and n[4] <= name[4]]
+            candidates = [n for n in wad if n.startswith(want[:4]) and len(n) >= 6
+                          and n[5] in ('0', '1') and n[4] <= want[4]]
             if not candidates:
                 raise ValueError('Missing Freedoom sprite ' + name)
             donor = max(candidates, key=lambda n: n[4])

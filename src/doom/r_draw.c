@@ -146,6 +146,11 @@ static int16_t floorclip[VIEWWINDOWWIDTH];
 static int16_t ceilingclip[VIEWWINDOWWIDTH];
 
 
+#if defined PEBBLE_EMERY
+// Constant sprite clip arrays, built on the heap by R_InitDrawTables: the
+// initialisers below would cost 480 bytes of the size-limited app image.
+static int16_t *screenheightarray, *negonearray;
+#else
 static int16_t screenheightarray[VIEWWINDOWWIDTH] =
 {
 #if VIEWWINDOWWIDTH == 240
@@ -435,6 +440,7 @@ static int16_t negonearray[VIEWWINDOWWIDTH] =
 #error unsupported VIEWWINDOWWIDTH value
 #endif
 };
+#endif
 
 
 //*****************************************
@@ -3043,6 +3049,16 @@ void R_InitDrawTables(void)
     if (!openings) openings = malloc(MAXOPENINGS * sizeof(*openings));
     if (!_s_drawsegs) _s_drawsegs = (drawseg_t*)malloc(MAXDRAWSEGS * sizeof(drawseg_t));
     if (!tantoangle16Table) tantoangle16Table = (angle16_t*)malloc(2049 * sizeof(angle16_t));
+#if defined PEBBLE_EMERY
+    screenheightarray = malloc(2 * VIEWWINDOWWIDTH * sizeof(int16_t));
+    if (!screenheightarray) I_Error("Render table allocation");
+    negonearray = screenheightarray + VIEWWINDOWWIDTH;
+    for (int16_t x = 0; x < VIEWWINDOWWIDTH; x++)
+    {
+        screenheightarray[x] = VIEWWINDOWHEIGHT;
+        negonearray[x] = -1;
+    }
+#endif
 
     if (!finetangentTable_part_3) finetangentTable_part_3 = (uint16_t*)malloc(1024 * sizeof(uint16_t));
     if (!finetangentTable_part_4) finetangentTable_part_4 = (fixed_t*)malloc(1024 * sizeof(fixed_t));

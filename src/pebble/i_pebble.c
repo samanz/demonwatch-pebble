@@ -13,6 +13,10 @@
 #include "../doom/w_wad.h"
 #include "../doom/z_zone.h"
 #include "../doom/p_map.h"
+#if defined PDOOM_PLAYTEST
+#include "../doom/p_mobj.h"
+#include "../doom/p_inter.h"
+#endif
 #include "../doom/tables.h"
 
 static Window *s_main_window;
@@ -41,7 +45,9 @@ static uint32_t s_message_until;
 static gamestate_t s_last_state=GS_DEMOSCREEN;  // logged on change, e.g. "state 1 map 1" = level cleared
 
 // Persistent storage keys (1-5 are settings).
-enum { KEY_SKILL=6, KEY_SOUND=7, KEY_CHECKPOINT=10 };
+enum { KEY_SKILL=6, KEY_SOUND=7, KEY_CHECKPOINT=10, KEY_BEST=20 };   // KEY_BEST+map: best time in tics
+static int32_t s_best_tics;     // best time for the level just finished
+static bool s_new_best;
 
 // Checkpoint: the map, skill and inventory at the moment a level was entered
 // (new game or next level). Continue, death retry and "Restart level" load
@@ -263,6 +269,15 @@ static void render_view(void) {
 static void canvas_update_proc(Layer *layer,GContext *ctx) {
     if(s_page!=GAME) { draw_menu(ctx); return; }
     uint32_t draw_start=now_ms();
+#if defined PBL_ROUND
+    GBitmap *fb=graphics_capture_frame_buffer_format(ctx,GBitmapFormat8BitCircular);
+    if(!fb) return;
+    ++s_frames;
+    I_SetPebbleBitmap(fb);
+    bool ok=guarded(render_view);
+    if(ok) ST_PebbleDrawer(NULL);
+    I_SetPebbleBitmap(NULL);
+#else
     GBitmap *fb=graphics_capture_frame_buffer_format(ctx,GBitmapFormat8Bit);
     if(!fb) return;
     ++s_frames;
@@ -271,6 +286,7 @@ static void canvas_update_proc(Layer *layer,GContext *ctx) {
     bool ok=guarded(render_view);
     if(ok) ST_PebbleDrawer(pixels);
     I_SetPebbleFramebuffer(NULL,PEBBLE_SCREEN_WIDTH,PEBBLE_SCREEN_HEIGHT);
+#endif
     graphics_release_frame_buffer(ctx,fb);
     if(!ok) { enter_fatal(); draw_menu(ctx); return; }
     graphics_context_set_text_color(ctx,GColorWhite);
@@ -296,9 +312,10 @@ static void canvas_update_proc(Layer *layer,GContext *ctx) {
         else {
             bool more=next_map_exists();
             title=more ? "LEVEL CLEAR" : "EPISODE CLEAR";
-            snprintf(stats,sizeof(stats),"Kills %d/%d  Secrets %d/%d\nTime %d:%02d\n%s",(int)_g_wminfo.plyr[0].skills,
+            int32_t secs=_g_wminfo.plyr[0].stime/TICRATE, best=s_best_tics/TICRATE;
+            snprintf(stats,sizeof(stats),"Kills %d/%d  Secrets %d/%d\nTime %d:%02d  %s %d:%02d\n%s",(int)_g_wminfo.plyr[0].skills,
                 (int)_g_wminfo.maxkills,(int)_g_wminfo.plyr[0].ssecret,(int)_g_wminfo.maxsecret,
-                (int)(_g_wminfo.plyr[0].stime/TICRATE/60),(int)(_g_wminfo.plyr[0].stime/TICRATE%60),
+                (int)(secs/60),(int)(secs%60),s_new_best ? "NEW BEST" : "Best",(int)(best/60),(int)(best%60),
                 more ? "Select: next level" : "The base is quiet. For now.\nSelect: play again");
             hint=stats;
         }
@@ -349,6 +366,17 @@ static void run_tics(void) {
             APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST warp");
             G_ExitLevel();
         }
+        // ...and holding Up for 4 s kills every monster (tests boss deaths).
+        static int s_up_tics;
+        s_up_tics=s_up ? s_up_tics+1 : 0;
+        if(s_up_tics==4*TICRATE && _g_gamestate==GS_LEVEL) {
+            APP_LOG(APP_LOG_LEVEL_WARNING,"PLAYTEST kill all");
+            for(thinker_t *th=_g_thinkerclasscap.next; th!=&_g_thinkerclasscap; th=th->next)
+                if(th->function==P_MobjThinker) {
+                    mobj_t *mo=(mobj_t *)th;
+                    if((mo->flags & MF_COUNTKILL) && mo->health>0) P_DamageMobj(mo,NULL,_g_player.mo,10000);
+                }
+        }
 #endif
         G_BuildTiccmd(); G_Ticker(); ++_g_gametic;
         if(s_fire_tics && !--s_fire_tics && !s_select_held) g_pebble_input.button_attack=false;
@@ -364,12 +392,19 @@ static void run_tics(void) {
             // finishing the last map clears it so the title offers no Continue.
             if(_g_gamestate==GS_LEVEL && !s_restored) save_checkpoint();
             if(_g_gamestate==GS_LEVEL) {
-                static const char *const names[]={"E1M1: Hangar Gate","E1M2: Toxin Refinery","E1M3: Command Center"};
+                static const char *const names[]={"E1M1: Hangar Gate","E1M2: Toxin Refinery","E1M3: Command Center","E1M4: Reactor Core"};
                 if(_g_gamemap>=1 && _g_gamemap<=(int)ARRAY_LENGTH(names)) {
                     s_message=names[_g_gamemap-1]; s_message_until=now_ms()+2500;
                 }
             }
-            if(_g_gamestate==GS_INTERMISSION && !next_map_exists()) persist_delete(KEY_CHECKPOINT);
+            if(_g_gamestate==GS_INTERMISSION) {
+                // Best time per map (any difficulty).
+                int32_t t=_g_wminfo.plyr[0].stime, key=KEY_BEST+_g_gamemap;
+                s_best_tics=persist_exists(key) ? persist_read_int(key) : 0;
+                s_new_best=!s_best_tics || t<s_best_tics;
+                if(s_new_best) { s_best_tics=t; persist_write_int(key,t); }
+                if(!next_map_exists()) persist_delete(KEY_CHECKPOINT);
+            }
             s_restored=false;
         }
         if(_g_player.health<old_health) {
@@ -545,7 +580,8 @@ static void click_config_provider(void *context) {
 }
 static void main_window_load(Window *window) {
     Layer *root=window_get_root_layer(window);
-    s_canvas_layer=layer_create(layer_get_bounds(root));
+    // The game's 200x228 layout: the whole Time 2 screen, centred on the Round 2.
+    s_canvas_layer=layer_create(GRect(PEBBLE_ORIGIN_X,PEBBLE_ORIGIN_Y,PEBBLE_SCREEN_WIDTH,PEBBLE_SCREEN_HEIGHT));
     if(!s_canvas_layer) I_Error("Canvas allocation");
     layer_set_update_proc(s_canvas_layer,canvas_update_proc);
     layer_add_child(root,s_canvas_layer);

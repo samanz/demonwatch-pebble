@@ -15,7 +15,7 @@ watch, walks a little and saves screenshots (work/map<N>-*.png). The emulator
 presses one button at a time, so no chorded input is used. Fails on engine
 errors, missing maps, checkpoint problems, or low zone memory.
 
-Usage: python3 tools/check_maps.py [number of maps, default 3]
+Usage: python3 tools/check_maps.py [number of maps, default 4]
 """
 import os
 import re
@@ -26,7 +26,7 @@ from pathlib import Path
 
 cmd = [sys.executable, '-u', 'tools/run_pebble.py']
 LOG = Path('work/check-maps.log')
-MAPS = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+MAPS = int(sys.argv[1]) if len(sys.argv) > 1 else 4
 MIN_ZONE = 1024   # bytes of zone that must stay free
 failures = []
 

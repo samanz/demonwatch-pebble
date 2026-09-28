@@ -468,8 +468,12 @@ void A_BossDeath(mobj_t __far* mo)
 {
     thinker_t __far* th;
 
+#if !defined PEBBLE_EMERY
+    // Pebble: any map may have a Baron finale (E1M4); sectors tagged 666
+    // lower once every Baron is dead.
     if (_g_gamemap != 8)
         return;
+#endif
 
     if (mo->type != MT_BRUISER)
         return;

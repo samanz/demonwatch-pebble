@@ -31,5 +31,12 @@ if [ "$1" = "--emulator" ]; then
     python3 tools/check_tap.py > work/check-tap-out.txt 2>&1 || {
         tail -20 work/check-tap-out.txt; exit 1; }
     tail -1 work/check-tap-out.txt
+    python3 tools/check_boss.py > work/check-boss-out.txt 2>&1 || {
+        tail -20 work/check-boss-out.txt; exit 1; }
+    tail -1 work/check-boss-out.txt
+    # Round 2: play the release build a little on the round-screen emulator.
+    EMULATOR=gabbro python3 tools/smoke_map.py build/pdoom.pbw round > work/smoke-round.txt 2>&1
+    grep -q 'no engine errors' work/smoke-round.txt || { tail -20 work/smoke-round.txt; exit 1; }
+    echo "PASS: Round 2 (gabbro) smoke run, no engine errors"
 fi
 echo "ALL CHECKS PASSED"
