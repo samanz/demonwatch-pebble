@@ -29,7 +29,7 @@ static bool s_touching, s_up, s_down, s_select_held;
 #define TAP_FIRE_TICS 3
 static uint8_t s_fire_tics;
 enum { TITLE, GAME, PAUSE, SETTINGS, HELP, SKILL, FATAL, ABOUT, MAP };
-#define PDOOM_VERSION "0.3.0"   // keep in step with package.json
+#define PDOOM_VERSION "0.4.0"   // keep in step with package.json
 static uint8_t s_page=TITLE, s_parent=TITLE, s_choice, s_sensitivity=2, s_tilt_mode=1, s_skill=sk_medium;
 static bool s_invert, s_vibe_enabled=true;
 #define s_paused (s_page != GAME)

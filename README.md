@@ -1,4 +1,4 @@
-# Demonwatch 0.3
+# Demonwatch 0.4
 
 (Development name: pDOOM. The repository, package name and internal identifiers still use `pdoom`; the app keeps the same UUID, so it installs over earlier builds with saves intact.)
 
